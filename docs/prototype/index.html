@@ -113,6 +113,51 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    /* ── Clan / Organization Identity Label (plaza statue) ── */
+    .clan-label {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #ffe566;
+      background: rgba(20, 12, 0, 0.82);
+      border: 1px solid rgba(255, 200, 40, 0.65);
+      border-radius: 7px;
+      padding: 5px 14px;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      backdrop-filter: blur(4px);
+      box-shadow:
+        0 0 14px rgba(255, 200, 0, 0.55),
+        0 0 32px rgba(255, 160, 0, 0.25),
+        0 2px 8px rgba(0, 0, 0, 0.7);
+      text-shadow: 0 0 10px rgba(255, 220, 60, 0.85);
+      animation: clan-pulse 2.8s ease-in-out infinite;
+    }
+    .clan-label .clan-icon {
+      margin-right: 7px;
+      font-size: 14px;
+      filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.8));
+    }
+    @keyframes clan-pulse {
+      0%, 100% {
+        box-shadow:
+          0 0 12px rgba(255, 200, 0, 0.45),
+          0 0 28px rgba(255, 160, 0, 0.18),
+          0 2px 8px rgba(0,0,0,0.7);
+        text-shadow: 0 0 8px rgba(255, 220, 60, 0.75);
+      }
+      50% {
+        box-shadow:
+          0 0 22px rgba(255, 210, 0, 0.75),
+          0 0 48px rgba(255, 170, 0, 0.38),
+          0 2px 8px rgba(0,0,0,0.7);
+        text-shadow: 0 0 16px rgba(255, 230, 80, 1.0);
+      }
+    }
+
     /* ── Floating Repo Labels ── */
     .repo-label {
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -430,6 +475,392 @@
       transition: color 0.15s;
     }
     .mr-repo-row:hover .mr-gitlab-arrow { color: #cc88ff; }
+
+    /* ═══════════════════════════════════════════════════════════
+       ── Dev Profile Panel ──────────────────────────────────────
+       ═══════════════════════════════════════════════════════════ */
+
+    /* HUD button — teal/cyan, mirrors the purple MR button style */
+    #dev-panel-btn {
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      pointer-events: all;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #66ddff;
+      background: rgba(40, 180, 220, 0.15);
+      border: 1px solid rgba(60, 200, 240, 0.5);
+      border-radius: 6px;
+      padding: 5px 11px;
+      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+      box-shadow: 0 0 8px rgba(40, 200, 240, 0.25);
+      width: 100%;
+      justify-content: center;
+      margin-top: 6px;
+    }
+    #dev-panel-btn:hover {
+      background: rgba(60, 210, 250, 0.28);
+      color: #aaeeff;
+      box-shadow: 0 0 14px rgba(40, 210, 250, 0.5);
+    }
+
+    /* Overlay — same dim/blur as MR panel */
+    #dev-panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 10, 22, 0.62);
+      backdrop-filter: blur(3px);
+      z-index: 9100;
+      align-items: center;
+      justify-content: center;
+    }
+    #dev-panel-overlay.open { display: flex; }
+
+    /* Card */
+    #dev-panel {
+      position: relative;
+      width: min(660px, 96vw);
+      max-height: 90vh;
+      background: rgba(6, 14, 30, 0.97);
+      border: 1px solid rgba(60, 200, 240, 0.4);
+      border-radius: 14px;
+      box-shadow: 0 0 40px rgba(40, 200, 240, 0.28), 0 8px 32px rgba(0,0,0,0.75);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: dev-panel-in 0.22s cubic-bezier(.2,.8,.4,1) both;
+    }
+    @keyframes dev-panel-in {
+      from { opacity: 0; transform: scale(0.92) translateY(12px); }
+      to   { opacity: 1; transform: scale(1)    translateY(0);    }
+    }
+
+    /* Header */
+    #dev-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 10px;
+      border-bottom: 1px solid rgba(60, 200, 240, 0.18);
+      flex-shrink: 0;
+    }
+    #dev-panel-title {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: #66ddff;
+      letter-spacing: 0.04em;
+      text-shadow: 0 0 10px rgba(60, 210, 255, 0.6);
+    }
+    #dev-panel-close {
+      all: unset;
+      cursor: pointer;
+      font-size: 18px;
+      color: rgba(255,255,255,0.4);
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 5px;
+      transition: color 0.15s, background 0.15s;
+    }
+    #dev-panel-close:hover { color: #ff88aa; background: rgba(255,80,100,0.15); }
+
+    /* Search bar row */
+    #dev-search-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 20px 8px;
+      flex-shrink: 0;
+    }
+    #dev-search-input {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(60, 200, 240, 0.35);
+      border-radius: 8px;
+      color: #e8f8ff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #dev-search-input::placeholder { color: rgba(120,180,210,0.5); }
+    #dev-search-input:focus {
+      border-color: rgba(60, 210, 255, 0.7);
+      box-shadow: 0 0 10px rgba(40, 200, 240, 0.3);
+    }
+
+    /* Suggestions dropdown */
+    #dev-suggestions {
+      list-style: none;
+      margin: 0 20px 6px;
+      padding: 0;
+      border: 1px solid rgba(60, 200, 240, 0.25);
+      border-radius: 8px;
+      background: rgba(6, 16, 34, 0.97);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #dev-suggestions:empty { display: none; }
+    #dev-suggestions li {
+      padding: 8px 14px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12.5px;
+      color: #cce8ff;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #dev-suggestions li:last-child { border-bottom: none; }
+    #dev-suggestions li:hover { background: rgba(60, 200, 240, 0.14); }
+    #dev-suggestions li .sug-role {
+      font-size: 10px;
+      color: rgba(120,190,220,0.55);
+      margin-left: auto;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Profile card area */
+    #dev-profile {
+      padding: 0 20px 6px;
+      flex-shrink: 0;
+    }
+    #dev-profile:empty { display: none; }
+    .dev-profile-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(60, 200, 240, 0.22);
+      border-radius: 10px;
+    }
+    .dev-avatar {
+      font-size: 36px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(40, 180, 220, 0.15);
+      border: 2px solid rgba(60, 200, 240, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 12px rgba(40, 200, 240, 0.3);
+    }
+    .dev-avatar.leader {
+      background: rgba(200, 160, 0, 0.18);
+      border-color: rgba(255, 200, 40, 0.6);
+      box-shadow: 0 0 14px rgba(255, 200, 0, 0.45);
+    }
+    .dev-avatar.female {
+      background: rgba(220, 80, 180, 0.15);
+      border-color: rgba(255, 140, 210, 0.45);
+      box-shadow: 0 0 12px rgba(255, 100, 200, 0.3);
+    }
+    .dev-info { flex: 1; min-width: 0; }
+    .dev-info-name {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: #e8f8ff;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dev-info-name.leader { color: #ffe566; text-shadow: 0 0 8px rgba(255,200,0,0.5); }
+    .dev-info-gitlab {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      color: rgba(100, 200, 240, 0.7);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dev-role-badge {
+      display: inline-block;
+      margin-top: 5px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .dev-role-badge.engineer  { color: #66ddff; background: rgba(40,180,220,0.15); border: 1px solid rgba(60,200,240,0.35); }
+    .dev-role-badge.leader    { color: #ffe566; background: rgba(200,160,0,0.15);  border: 1px solid rgba(255,200,40,0.45); }
+    .dev-role-badge.caretaker { color: #88ffaa; background: rgba(40,180,80,0.15);  border: 1px solid rgba(60,220,100,0.4); }
+
+    /* Activity section title */
+    .dev-section-title {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(100,190,230,0.55);
+      padding: 10px 20px 4px;
+      flex-shrink: 0;
+    }
+
+    /* Activity stats row (commit / mr opened / mr merged counts) */
+    #dev-stats-row {
+      display: flex;
+      gap: 8px;
+      padding: 2px 20px 10px;
+      flex-shrink: 0;
+    }
+    .dev-stat-box {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .dev-stat-box .stat-num {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+    .dev-stat-box .stat-lbl {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      margin-top: 2px;
+      opacity: 0.6;
+    }
+    .dev-stat-box.commits  { border-color: rgba(255,200,40,0.3);  }
+    .dev-stat-box.commits  .stat-num { color: #ffdd66; text-shadow: 0 0 8px rgba(255,200,0,0.5); }
+    .dev-stat-box.commits  .stat-lbl { color: #ffdd66; }
+    .dev-stat-box.mr-open  { border-color: rgba(180,80,255,0.3);  }
+    .dev-stat-box.mr-open  .stat-num { color: #cc88ff; text-shadow: 0 0 8px rgba(180,60,255,0.5); }
+    .dev-stat-box.mr-open  .stat-lbl { color: #cc88ff; }
+    .dev-stat-box.mr-merge { border-color: rgba(80,220,120,0.3);  }
+    .dev-stat-box.mr-merge .stat-num { color: #66ff99; text-shadow: 0 0 8px rgba(60,220,100,0.5); }
+    .dev-stat-box.mr-merge .stat-lbl { color: #66ff99; }
+    .dev-stat-box.pipeline { border-color: rgba(60,200,240,0.3); }
+    .dev-stat-box.pipeline .stat-num { color: #66ddff; text-shadow: 0 0 8px rgba(40,200,240,0.5); }
+    .dev-stat-box.pipeline .stat-lbl { color: #66ddff; }
+
+    /* Scrollable repo breakdown table */
+    #dev-activity-list {
+      overflow-y: auto;
+      padding: 0 14px 16px;
+      flex: 1;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(60,200,240,0.35) transparent;
+    }
+    #dev-activity-list::-webkit-scrollbar { width: 5px; }
+    #dev-activity-list::-webkit-scrollbar-track { background: transparent; }
+    #dev-activity-list::-webkit-scrollbar-thumb { background: rgba(60,200,240,0.35); border-radius: 3px; }
+
+    /* Table header row */
+    .dev-repo-header {
+      display: grid;
+      grid-template-columns: 24px 1fr 68px 68px 68px 68px;
+      gap: 0 6px;
+      padding: 5px 10px;
+      margin-bottom: 2px;
+    }
+    .dev-repo-header-lbl {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      text-align: center;
+      opacity: 0.4;
+      color: #ccd8f8;
+    }
+    .dev-repo-header-lbl.left { text-align: left; }
+
+    /* One row per repo */
+    .dev-repo-row {
+      display: grid;
+      grid-template-columns: 24px 1fr 68px 68px 68px 68px;
+      gap: 0 6px;
+      align-items: center;
+      padding: 8px 10px;
+      margin-bottom: 3px;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.025);
+      transition: background 0.15s;
+    }
+    .dev-repo-row:hover { background: rgba(60,200,240,0.06); border-color: rgba(60,200,240,0.18); }
+    .dev-repo-row.active { background: rgba(60,200,240,0.08); border-color: rgba(60,200,240,0.28); }
+    .dev-repo-icon { font-size: 14px; text-align: center; }
+    .dev-repo-name {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      color: #ccd8f8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Mini stat cell (number + icon) */
+    .dev-mini-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 5px;
+      padding: 4px 4px;
+      min-width: 0;
+    }
+    .dev-mini-stat .msn {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .dev-mini-stat .msi {
+      font-size: 9px;
+      margin-top: 2px;
+      opacity: 0.55;
+      letter-spacing: 0.04em;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .dev-mini-stat.c  { background: rgba(255,200,40,0.07);  }
+    .dev-mini-stat.c  .msn { color: #ffdd66; text-shadow: 0 0 6px rgba(255,200,0,0.4); }
+    .dev-mini-stat.c  .msi { color: #ffdd66; }
+    .dev-mini-stat.mo { background: rgba(180,80,255,0.07);  }
+    .dev-mini-stat.mo .msn { color: #cc88ff; text-shadow: 0 0 6px rgba(180,60,255,0.4); }
+    .dev-mini-stat.mo .msi { color: #cc88ff; }
+    .dev-mini-stat.mm { background: rgba(80,220,120,0.07);  }
+    .dev-mini-stat.mm .msn { color: #66ff99; text-shadow: 0 0 6px rgba(60,220,100,0.4); }
+    .dev-mini-stat.mm .msi { color: #66ff99; }
+    .dev-mini-stat.pi { background: rgba(60,200,240,0.07); }
+    .dev-mini-stat.pi .msn { color: #66ddff; text-shadow: 0 0 6px rgba(40,200,240,0.4); }
+    .dev-mini-stat.pi .msi { color: #66ddff; }
+    /* dim zero values */
+    .dev-mini-stat .msn.zero { opacity: 0.22; text-shadow: none; }
+
+    #dev-empty-state {
+      padding: 28px 0;
+      text-align: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      color: rgba(120,180,210,0.45);
+    }
   </style>
 </head>
 <body>
@@ -451,6 +882,39 @@
   </div>
   <div class="stat-row" style="border-bottom:none; padding-top:10px;">
     <button id="mr-panel-btn" onclick="toggleMRPanel()">🔀 Open MRs</button>
+  </div>
+  <div class="stat-row" style="border-bottom:none; padding-top:0;">
+    <button id="dev-panel-btn" onclick="openDevPanel()">👤 Dev Profile</button>
+  </div>
+</div>
+
+<!-- ── Dev Profile Panel ── -->
+<div id="dev-panel-overlay" onclick="closeDevPanel(event)">
+  <div id="dev-panel">
+    <div id="dev-panel-header">
+      <span id="dev-panel-title">👤 Developer Profile</span>
+      <button id="dev-panel-close" onclick="closeDevPanelDirect()">✕</button>
+    </div>
+
+    <!-- Search row -->
+    <div id="dev-search-row">
+      <input id="dev-search-input" type="text" placeholder="Search by name or GitLab username…"
+             oninput="onDevSearch(this.value)" autocomplete="off" spellcheck="false" />
+    </div>
+    <!-- Live suggestions -->
+    <ul id="dev-suggestions"></ul>
+
+    <!-- Profile card (filled by JS when a dev is selected) -->
+    <div id="dev-profile"></div>
+
+    <!-- Stats row -->
+    <div class="dev-section-title" id="dev-activity-title" style="display:none">Activity by Repository</div>
+    <div id="dev-stats-row"></div>
+
+    <!-- Activity log -->
+    <div id="dev-activity-list">
+      <div id="dev-empty-state">Search for a developer above</div>
+    </div>
   </div>
 </div>
 
@@ -736,7 +1200,20 @@ box(0.18, 0.18, 0.18, 0x9a8a6a,  0.0,  1.52, 0);      // head
 box(0.22, 0.07, 0.22, 0x6a5a3a,  0.0,  1.64, 0);      // hat brim
 cyl(0.08, 0.10, 0.14, 0x6a5a3a,  0.0,  1.75, 0);      // hat crown
 
-// ── Walking Paths (light brown planes) ────────────────────────
+// ── Clan / Organization identity label — floats just above the statue hat ──
+// Hat crown top ≈ Y 1.82; anchor at Y 2.3 puts the label right above the head.
+{
+  const clanAnchor = new THREE.Object3D();
+  clanAnchor.position.set(0, 2.3, 0);
+  scene.add(clanAnchor);
+
+  const clanDiv = document.createElement('div');
+  clanDiv.className = 'clan-label';
+  clanDiv.innerHTML = '<span class="clan-icon">⚔️</span>Partnership';
+
+  const clanLabelObj = new CSS2DObject(clanDiv);
+  clanAnchor.add(clanLabelObj);
+}
 // Main cross paths (extended to reach outer attractions at ±35)
 plane(4, 75, 0xc8a97a, 0, 0.03,  0);          // N–S
 plane(75, 4, 0xc8a97a, 0, 0.03,  0);          // E–W
@@ -1486,42 +1963,42 @@ const ROAD_GRAPH = [
 //   'female' — skirt + hair bun, slightly shorter torso
 
 const PEOPLE = [
-  { name:'Aditya Novandri',  gender:'male',   role:'engineer'   },
-  { name:'Agung Maulana',    gender:'male',   role:'engineer'   },
-  { name:'Agus Triantoro',   gender:'male',   role:'engineer'   },
-  { name:'Ali H',            gender:'male',   role:'engineer'   },
-  { name:'Andes',            gender:'male',   role:'engineer'   },
-  { name:'Ardi Rizmaldi',    gender:'male',   role:'engineer'   },
-  { name:'Ardy',             gender:'male',   role:'engineer'   },
-  { name:'Astrid',           gender:'female', role:'engineer'   },
-  { name:'Dani',             gender:'male',   role:'engineer'   },
-  { name:'Djamal_a_m',       gender:'male',   role:'engineer'   },
-  { name:'Edityo',           gender:'male',   role:'engineer'   },
-  { name:'Evan.Rahanda',     gender:'male',   role:'engineer'   },
-  { name:'Fina',             gender:'female', role:'engineer'   },
-  { name:'Hasan',            gender:'male',   role:'engineer'   },
-  { name:'Hedy Simamora',    gender:'male',   role:'engineer'   },
-  { name:'Hendry',           gender:'male',   role:'engineer'   },
-  { name:'Iman',             gender:'male',   role:'engineer'   },
-  { name:'Jamal SA',         gender:'male',   role:'engineer'   },
-  { name:'Kent K',           gender:'male',   role:'caretaker'  },
-  { name:'Mahen',            gender:'male',   role:'engineer'   },
-  { name:'Meicen',           gender:'female', role:'engineer'   },
-  { name:'Meita',            gender:'female', role:'caretaker'  },
-  { name:'Nabiila',          gender:'female', role:'engineer'   },
-  { name:'Naura',            gender:'female', role:'engineer'   },
-  { name:'Nita',             gender:'female', role:'engineer'   },
-  { name:'Rangga',           gender:'male',   role:'engineer'   },
-  { name:'Reyhan',           gender:'male',   role:'engineer'   },
-  { name:'Rizki Ekaputri',   gender:'female', role:'engineer'   },
-  { name:'Septebrina',       gender:'female', role:'engineer'   },
-  { name:'Sisi Maukar',      gender:'female', role:'engineer'   },
-  { name:'Taufik',           gender:'male',   role:'engineer'   },
-  { name:'Tedi Yuwono',      gender:'male',   role:'engineer'   },
-  { name:'Tommi Irawan',     gender:'male',   role:'engineer'   },
-  { name:'Wina',             gender:'female', role:'engineer'   },
-  { name:'Wira',             gender:'male',   role:'leader'     },
-  { name:'Yuni Marlina',     gender:'female', role:'engineer'   },
+  { name:'Aditya Novandri',  gitlab:'aditya.novandri',    gender:'male',   role:'engineer'   },
+  { name:'Agung Maulana',    gitlab:'agung.maulana',      gender:'male',   role:'engineer'   },
+  { name:'Agus Triantoro',   gitlab:'agus.triantoro',     gender:'male',   role:'engineer'   },
+  { name:'Ali H',            gitlab:'ali.h',              gender:'male',   role:'engineer'   },
+  { name:'Andes',            gitlab:'andes',              gender:'male',   role:'engineer'   },
+  { name:'Ardi Rizmaldi',    gitlab:'ardi.rizmaldi',      gender:'male',   role:'engineer'   },
+  { name:'Ardy',             gitlab:'ardy',               gender:'male',   role:'engineer'   },
+  { name:'Astrid',           gitlab:'astrid',             gender:'female', role:'engineer'   },
+  { name:'Dani',             gitlab:'dani',               gender:'male',   role:'engineer'   },
+  { name:'Djamal_a_m',       gitlab:'djamal_a_m',         gender:'male',   role:'engineer'   },
+  { name:'Edityo',           gitlab:'edityo',             gender:'male',   role:'engineer'   },
+  { name:'Evan.Rahanda',     gitlab:'evan.rahanda',       gender:'male',   role:'engineer'   },
+  { name:'Fina',             gitlab:'fina',               gender:'female', role:'engineer'   },
+  { name:'Hasan',            gitlab:'hasan',              gender:'male',   role:'engineer'   },
+  { name:'Hedy Simamora',    gitlab:'hedy.simamora',      gender:'male',   role:'engineer'   },
+  { name:'Hendry',           gitlab:'hendry',             gender:'male',   role:'engineer'   },
+  { name:'Iman',             gitlab:'iman',               gender:'male',   role:'engineer'   },
+  { name:'Jamal SA',         gitlab:'jamal.sa',           gender:'male',   role:'engineer'   },
+  { name:'Kent K',           gitlab:'kent.k',             gender:'male',   role:'caretaker'  },
+  { name:'Mahen',            gitlab:'mahen',              gender:'male',   role:'engineer'   },
+  { name:'Meicen',           gitlab:'meicen',             gender:'female', role:'engineer'   },
+  { name:'Meita',            gitlab:'meita',              gender:'female', role:'caretaker'  },
+  { name:'Nabiila',          gitlab:'nabiila',            gender:'female', role:'engineer'   },
+  { name:'Naura',            gitlab:'naura',              gender:'female', role:'engineer'   },
+  { name:'Nita',             gitlab:'nita',               gender:'female', role:'engineer'   },
+  { name:'Rangga',           gitlab:'rangga',             gender:'male',   role:'engineer'   },
+  { name:'Reyhan',           gitlab:'reyhan',             gender:'male',   role:'engineer'   },
+  { name:'Rizki Ekaputri',   gitlab:'rizki.ekaputri',     gender:'female', role:'engineer'   },
+  { name:'Septebrina',       gitlab:'septebrina',         gender:'female', role:'engineer'   },
+  { name:'Sisi Maukar',      gitlab:'sisi.maukar',        gender:'female', role:'engineer'   },
+  { name:'Taufik',           gitlab:'taufik',             gender:'male',   role:'engineer'   },
+  { name:'Tedi Yuwono',      gitlab:'tedi.yuwono',        gender:'male',   role:'engineer'   },
+  { name:'Tommi Irawan',     gitlab:'tommi.irawan',       gender:'male',   role:'engineer'   },
+  { name:'Wina',             gitlab:'wina',               gender:'female', role:'engineer'   },
+  { name:'Wira',             gitlab:'wira',               gender:'male',   role:'leader'     },
+  { name:'Yuni Marlina',     gitlab:'yuni.marlina',       gender:'female', role:'engineer'   },
 ];
 
 // Shirt palette — engineers cycle; caretakers green; leader gold
@@ -2013,6 +2490,9 @@ function deactivateMergeSuccess(struct) {
 }
 
 function triggerMergeSuccess(struct, dev) {
+  // Record mr-merge + pipeline events for the dev profile panel
+  recordActivity(dev.name, 'mr-merge', struct.repo);
+  recordActivity(dev.name, 'pipeline', struct.repo);
   // Hide MR visuals without touching the toast (we'll show a new toast)
   if (struct.mrBeam) struct.mrBeam.fadeOut = true;
   if (struct.mrIndicator) {
@@ -2454,6 +2934,225 @@ function closeMRPanelDirect() {
 window.toggleMRPanel      = toggleMRPanel;
 window.closeMRPanel       = closeMRPanel;
 window.closeMRPanelDirect = closeMRPanelDirect;
+
+// ═══════════════════════════════════════════════════════════════
+// ── Dev Profile Panel ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+// Activity log: accumulated as simulated events fire during the session.
+// Each entry: { type: 'commit'|'mr-open'|'mr-merge', repo, time }
+const devActivityLog = {};   // keyed by dev name (matches PEOPLE[].name)
+PEOPLE.forEach(p => { devActivityLog[p.name] = []; });
+
+// Hook into the existing job machinery to record activities as they happen.
+// We patch the job-creation points by wrapping the existing fire* functions.
+const _origFireCommit = fireCommitEvent;
+// (We can't easily wrap the closures, so instead we record inside animate()
+//  by watching job arrival — see recordJobActivity() calls added below.)
+
+function recordActivity(devName, type, repo) {
+  const log = devActivityLog[devName];
+  if (!log) return;
+  log.unshift({ type, repo, time: new Date() });
+  if (log.length > 40) log.length = 40;   // keep last 40 per dev
+
+  // If the dev panel is open and showing this dev, refresh live
+  const activeCard = document.querySelector('.dev-profile-card[data-dev]');
+  if (activeCard && activeCard.dataset.dev === devName) {
+    renderDevActivity(devName);
+  }
+}
+
+// Called from animate() when a job arrives — we patch job objects to set
+// a `recorded` flag so we only record once per job.
+function maybeRecordJobArrival(job, type) {
+  if (job._recorded) return;
+  job._recorded = true;
+  recordActivity(job.dev.name, type, job.struct.repo);
+}
+
+// ── Fuzzy search ──────────────────────────────────────────────
+function searchPeople(query) {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase();
+  return PEOPLE.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    p.gitlab.toLowerCase().includes(q)
+  ).slice(0, 6);
+}
+
+// ── Avatar emoji based on gender/role ─────────────────────────
+function avatarFor(p) {
+  if (p.role === 'leader')    return '👑';
+  if (p.role === 'caretaker') return p.gender === 'female' ? '🌿' : '🌳';
+  return p.gender === 'female' ? '👩‍💻' : '👨‍💻';
+}
+
+// ── Render profile card ───────────────────────────────────────
+function renderDevProfile(person) {
+  const profileEl = document.getElementById('dev-profile');
+  const avatarCls = person.role === 'leader' ? 'leader' : person.gender === 'female' ? 'female' : '';
+  const nameCls   = person.role === 'leader' ? 'leader' : '';
+  profileEl.innerHTML = `
+    <div class="dev-profile-card" data-dev="${person.name}">
+      <div class="dev-avatar ${avatarCls}">${avatarFor(person)}</div>
+      <div class="dev-info">
+        <div class="dev-info-name ${nameCls}">${person.name}</div>
+        <div class="dev-info-gitlab">@${person.gitlab}</div>
+        <span class="dev-role-badge ${person.role}">${person.role}</span>
+      </div>
+    </div>`;
+}
+
+// ── Render stats + per-repo breakdown table ───────────────────
+function renderDevActivity(devName) {
+  const log = devActivityLog[devName] || [];
+
+  // ── 1. Aggregate totals (for the 4 summary boxes) ────────────
+  const totals = { commit: 0, 'mr-open': 0, 'mr-merge': 0, pipeline: 0 };
+  log.forEach(e => { if (totals[e.type] !== undefined) totals[e.type]++; });
+
+  const statsEl = document.getElementById('dev-stats-row');
+  statsEl.innerHTML = `
+    <div class="dev-stat-box commits">
+      <div class="stat-num">${totals.commit}</div>
+      <div class="stat-lbl">Commits</div>
+    </div>
+    <div class="dev-stat-box mr-open">
+      <div class="stat-num">${totals['mr-open']}</div>
+      <div class="stat-lbl">MRs Opened</div>
+    </div>
+    <div class="dev-stat-box mr-merge">
+      <div class="stat-num">${totals['mr-merge']}</div>
+      <div class="stat-lbl">MRs Merged</div>
+    </div>
+    <div class="dev-stat-box pipeline">
+      <div class="stat-num">${totals.pipeline}</div>
+      <div class="stat-lbl">Pipelines</div>
+    </div>`;
+
+  document.getElementById('dev-activity-title').style.display = '';
+
+  // ── 2. Build per-repo counts ──────────────────────────────────
+  // repoStats: { [repoName]: { commit, mr-open, mr-merge, pipeline } }
+  const repoStats = {};
+  STRUCTURES.forEach(s => {
+    repoStats[s.repo] = { commit: 0, 'mr-open': 0, 'mr-merge': 0, pipeline: 0, icon: s.icon };
+  });
+  log.forEach(e => {
+    if (repoStats[e.repo]) repoStats[e.repo][e.type]++;
+  });
+
+  const listEl = document.getElementById('dev-activity-list');
+
+  if (log.length === 0) {
+    listEl.innerHTML = '<div id="dev-empty-state">No activity recorded yet this session.<br>Activity accumulates as the simulation runs.</div>';
+    return;
+  }
+
+  // Sort repos: repos with any activity first (by total desc), then the rest
+  const sorted = STRUCTURES.slice().sort((a, b) => {
+    const ta = Object.values(repoStats[a.repo]).filter(v => typeof v === 'number').reduce((s,v)=>s+v,0);
+    const tb = Object.values(repoStats[b.repo]).filter(v => typeof v === 'number').reduce((s,v)=>s+v,0);
+    return tb - ta;
+  });
+
+  const n = v => `<span class="msn${v === 0 ? ' zero' : ''}">${v}</span>`;
+
+  listEl.innerHTML = `
+    <div class="dev-repo-header">
+      <div></div>
+      <div class="dev-repo-header-lbl left">Repository</div>
+      <div class="dev-repo-header-lbl" title="Commits">🔨<br>Commits</div>
+      <div class="dev-repo-header-lbl" title="MRs Opened">🔀<br>Open</div>
+      <div class="dev-repo-header-lbl" title="MRs Merged">✅<br>Merged</div>
+      <div class="dev-repo-header-lbl" title="Pipelines">⚙️<br>Pipelines</div>
+    </div>
+    ${sorted.map(s => {
+      const r   = repoStats[s.repo];
+      const tot = r.commit + r['mr-open'] + r['mr-merge'] + r.pipeline;
+      return `
+        <div class="dev-repo-row${tot > 0 ? ' active' : ''}">
+          <div class="dev-repo-icon">${s.icon}</div>
+          <div class="dev-repo-name" title="${s.repo}">${s.repo}</div>
+          <div class="dev-mini-stat c">${n(r.commit)}<span class="msi">commits</span></div>
+          <div class="dev-mini-stat mo">${n(r['mr-open'])}<span class="msi">open</span></div>
+          <div class="dev-mini-stat mm">${n(r['mr-merge'])}<span class="msi">merged</span></div>
+          <div class="dev-mini-stat pi">${n(r.pipeline)}<span class="msi">pipelines</span></div>
+        </div>`;
+    }).join('')}`;
+}
+
+// ── Select a developer ────────────────────────────────────────
+function selectDev(person) {
+  // Clear search
+  document.getElementById('dev-search-input').value  = person.name;
+  document.getElementById('dev-suggestions').innerHTML = '';
+
+  renderDevProfile(person);
+  renderDevActivity(person.name);
+}
+
+// ── Search input handler ──────────────────────────────────────
+function onDevSearch(value) {
+  const sugEl = document.getElementById('dev-suggestions');
+  const results = searchPeople(value);
+  if (results.length === 0) { sugEl.innerHTML = ''; return; }
+
+  sugEl.innerHTML = results.map(p => `
+    <li onclick="window._selectDevByName('${p.name.replace(/'/g, "\\'")}')">
+      <span>${avatarFor(p)}</span>
+      <span>${p.name}</span>
+      <span style="font-size:11px;color:rgba(100,190,220,0.6)">@${p.gitlab}</span>
+      <span class="sug-role">${p.role}</span>
+    </li>`).join('');
+}
+
+window._selectDevByName = function(name) {
+  const person = PEOPLE.find(p => p.name === name);
+  if (person) selectDev(person);
+};
+
+// ── Panel open/close ──────────────────────────────────────────
+function openDevPanel() {
+  document.getElementById('dev-panel-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('dev-search-input').focus(), 80);
+}
+function closeDevPanel(e) {
+  if (e.target === document.getElementById('dev-panel-overlay'))
+    document.getElementById('dev-panel-overlay').classList.remove('open');
+}
+function closeDevPanelDirect() {
+  document.getElementById('dev-panel-overlay').classList.remove('open');
+}
+
+window.openDevPanel       = openDevPanel;
+window.closeDevPanel      = closeDevPanel;
+window.closeDevPanelDirect= closeDevPanelDirect;
+window.onDevSearch        = onDevSearch;
+
+// ── Tap into job arrival in the animate loop ──────────────────
+// We monkey-patch the arrays so we can observe new arrivals without
+// touching the existing animation logic.
+const _origActiveJobsPush   = activeJobs.push.bind(activeJobs);
+const _origActiveMRJobsPush = activeMRJobs.push.bind(activeMRJobs);
+
+// Instead of monkey-patching (fragile), we record in a rAF post-pass.
+// Each frame, scan jobs that just arrived (arrived===true, !_recorded).
+const _rafRecorder = () => {
+  activeJobs.forEach(job => {
+    if (job.arrived && !job._recorded) {
+      maybeRecordJobArrival(job, 'commit');
+      // Every commit triggers a CI pipeline
+      recordActivity(job.dev.name, 'pipeline', job.struct.repo);
+    }
+  });
+  activeMRJobs.forEach(job => {
+    if (job.arrived && !job._recorded) maybeRecordJobArrival(job, 'mr-open');
+  });
+  requestAnimationFrame(_rafRecorder);
+};
+requestAnimationFrame(_rafRecorder);
 </script>
 </body>
 </html>
