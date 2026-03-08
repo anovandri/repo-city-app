@@ -1,0 +1,2459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Playground Park</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #87ceeb; }
+    canvas { display: block; }
+
+    /* ── HUD Panel ── */
+    #hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: rgba(10, 20, 35, 0.72);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: #e8f0fe;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      min-width: 190px;
+      user-select: none;
+      pointer-events: none;
+    }
+    #hud h2 {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #7ab8ff;
+      margin-bottom: 10px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #9ab0cc; }
+    .stat-value {
+      font-weight: 700;
+      font-size: 15px;
+      color: #ffffff;
+    }
+    .dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: #4cdd7a;
+      box-shadow: 0 0 5px #4cdd7a;
+    }
+
+    /* ── Commit Activity Indicator ── */
+    .commit-indicator {
+      font-size: 20px;
+      line-height: 1;
+      filter: drop-shadow(0 0 6px rgba(255,200,0,0.9));
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.4s ease;
+    }
+    .commit-indicator.hidden { opacity: 0; }
+
+    /* ── Merge Request Activity Indicator ── */
+    .mr-indicator {
+      font-size: 20px;
+      line-height: 1;
+      filter: drop-shadow(0 0 6px rgba(180,80,255,0.95));
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.4s ease;
+    }
+    .mr-indicator.hidden { opacity: 0; }
+
+    /* ── Merge Success Indicator ── */
+    .merged-indicator {
+      font-size: 20px;
+      line-height: 1;
+      filter: drop-shadow(0 0 6px rgba(80,220,120,0.95));
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.4s ease;
+    }
+    .merged-indicator.hidden { opacity: 0; }
+
+    /* ── Commit Toast ── */
+    #commit-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(10, 20, 35, 0.88);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(100,200,120,0.4);
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      color: #c8ffd4;
+      opacity: 0;
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #commit-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Floating Repo Labels ── */
+    .repo-label {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: #ffffff;
+      background: rgba(8, 18, 32, 0.78);
+      border: 1px solid rgba(120, 180, 255, 0.35);
+      border-radius: 5px;
+      padding: 3px 7px;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(3px);
+      box-shadow: 0 1px 6px rgba(0,0,0,0.45);
+    }
+    .repo-label .repo-icon {
+      margin-right: 4px;
+    }
+    /* Production-support / hot variant */
+    .repo-label--support {
+      color: #ff4444;
+      background: rgba(32, 4, 4, 0.88);
+      border-color: rgba(255, 60, 60, 0.7);
+      box-shadow: 0 0 10px rgba(255, 40, 40, 0.55);
+      animation: support-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes support-pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 40, 40, 0.5); }
+      50%       { box-shadow: 0 0 18px rgba(255, 80, 80, 0.9); }
+    }
+    .support-badge {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #fff;
+      background: rgba(200, 0, 0, 0.75);
+      border: 1px solid rgba(255, 80, 80, 0.7);
+      border-radius: 3px;
+      padding: 1px 4px;
+      vertical-align: middle;
+    }
+    /* Sunset / maintenance-mode variant */
+    .repo-label--sunset {
+      color: #ffe066;
+      background: rgba(40, 20, 0, 0.85);
+      border-color: rgba(255, 160, 0, 0.6);
+      box-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
+    }
+    .sunset-badge {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #ff6600;
+      background: rgba(255,80,0,0.18);
+      border: 1px solid rgba(255,100,0,0.5);
+      border-radius: 3px;
+      padding: 1px 4px;
+      vertical-align: middle;
+    }
+    /* ── Developer name chips ── */
+    .dev-name {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 9px;
+      font-weight: 600;
+      color: #e8f4ff;
+      background: rgba(8, 18, 36, 0.72);
+      border: 1px solid rgba(120, 180, 255, 0.28);
+      border-radius: 4px;
+      padding: 1px 5px;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      backdrop-filter: blur(2px);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+    .dev-name--female {
+      color: #ffd6f0;
+      border-color: rgba(255, 160, 220, 0.35);
+      background: rgba(36, 8, 28, 0.72);
+    }
+    .dev-name--caretaker {
+      color: #c8ffd4;
+      border-color: rgba(80, 220, 120, 0.4);
+      background: rgba(8, 32, 16, 0.78);
+    }
+    .dev-name--leader {
+      color: #ffe566;
+      border-color: rgba(255, 200, 40, 0.6);
+      background: rgba(32, 24, 0, 0.88);
+      font-size: 10px;
+      font-weight: 700;
+      box-shadow: 0 0 8px rgba(255, 200, 0, 0.5);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Open MRs HUD Button ── */
+    #mr-panel-btn {
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      pointer-events: all;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #cc88ff;
+      background: rgba(140, 60, 255, 0.18);
+      border: 1px solid rgba(180, 80, 255, 0.55);
+      border-radius: 6px;
+      padding: 5px 11px;
+      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+      box-shadow: 0 0 8px rgba(160, 60, 255, 0.3);
+      width: 100%;
+      justify-content: center;
+    }
+    #mr-panel-btn:hover {
+      background: rgba(180, 80, 255, 0.32);
+      color: #e8aaff;
+      box-shadow: 0 0 14px rgba(180, 60, 255, 0.55);
+    }
+
+    /* ── MR Panel Overlay ── */
+    #mr-panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 10, 22, 0.62);
+      backdrop-filter: blur(3px);
+      z-index: 9000;
+      align-items: center;
+      justify-content: center;
+    }
+    #mr-panel-overlay.open { display: flex; }
+
+    /* ── MR Panel Card ── */
+    #mr-panel {
+      position: relative;
+      width: min(560px, 92vw);
+      max-height: 82vh;
+      background: rgba(8, 16, 34, 0.96);
+      border: 1px solid rgba(180, 80, 255, 0.45);
+      border-radius: 14px;
+      box-shadow: 0 0 40px rgba(160, 60, 255, 0.35), 0 8px 32px rgba(0,0,0,0.7);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: mr-panel-in 0.22s cubic-bezier(.2,.8,.4,1) both;
+    }
+    @keyframes mr-panel-in {
+      from { opacity: 0; transform: scale(0.92) translateY(12px); }
+      to   { opacity: 1; transform: scale(1)    translateY(0);    }
+    }
+
+    /* ── Panel header ── */
+    #mr-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 10px;
+      border-bottom: 1px solid rgba(180, 80, 255, 0.22);
+      flex-shrink: 0;
+    }
+    #mr-panel-title {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+      color: #dd99ff;
+      letter-spacing: 0.03em;
+      text-shadow: 0 0 12px rgba(200, 100, 255, 0.6);
+    }
+    #mr-panel-close {
+      all: unset;
+      cursor: pointer;
+      font-size: 18px;
+      color: rgba(255,255,255,0.4);
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 5px;
+      transition: color 0.15s, background 0.15s;
+    }
+    #mr-panel-close:hover { color: #ff88aa; background: rgba(255,80,100,0.15); }
+
+    /* subtitle + total */
+    #mr-panel-subtitle {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      color: rgba(200,180,255,0.55);
+      padding: 6px 20px 0;
+      flex-shrink: 0;
+    }
+    #mr-panel-total-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px 10px;
+      flex-shrink: 0;
+    }
+    #mr-panel-total-label {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      color: rgba(200,180,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    #mr-panel-total-value {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: #ff66cc;
+      text-shadow: 0 0 12px rgba(255,80,200,0.7);
+    }
+
+    /* ── Scrollable list ── */
+    #mr-panel-list {
+      overflow-y: auto;
+      padding: 6px 14px 16px;
+      flex: 1;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(180,80,255,0.4) transparent;
+    }
+    #mr-panel-list::-webkit-scrollbar { width: 5px; }
+    #mr-panel-list::-webkit-scrollbar-track { background: transparent; }
+    #mr-panel-list::-webkit-scrollbar-thumb { background: rgba(180,80,255,0.4); border-radius: 3px; }
+
+    /* ── Repo rows ── */
+    .mr-repo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 5px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.035);
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .mr-repo-row:hover {
+      background: rgba(180, 80, 255, 0.13);
+      border-color: rgba(180, 80, 255, 0.4);
+      box-shadow: 0 0 12px rgba(180,60,255,0.25);
+    }
+    .mr-repo-row.zero {
+      opacity: 0.42;
+    }
+    .mr-repo-row.zero:hover { opacity: 0.75; }
+
+    .mr-repo-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      width: 26px;
+      text-align: center;
+    }
+    .mr-repo-name {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #ccd8f8;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mr-repo-row:hover .mr-repo-name { color: #eeddff; }
+
+    .mr-count-badge {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px;
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 11px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .mr-count-badge.high {
+      background: rgba(255, 60, 100, 0.22);
+      border: 1px solid rgba(255, 60, 100, 0.55);
+      color: #ff6688;
+      box-shadow: 0 0 8px rgba(255,40,80,0.35);
+    }
+    .mr-count-badge.medium {
+      background: rgba(255, 160, 40, 0.18);
+      border: 1px solid rgba(255, 160, 40, 0.5);
+      color: #ffb840;
+      box-shadow: 0 0 6px rgba(255,140,20,0.3);
+    }
+    .mr-count-badge.low {
+      background: rgba(80, 200, 255, 0.15);
+      border: 1px solid rgba(80, 200, 255, 0.4);
+      color: #66ddff;
+    }
+    .mr-count-badge.zero {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.3);
+    }
+    .mr-gitlab-arrow {
+      flex-shrink: 0;
+      color: rgba(180,130,255,0.45);
+      font-size: 13px;
+      transition: color 0.15s;
+    }
+    .mr-repo-row:hover .mr-gitlab-arrow { color: #cc88ff; }
+  </style>
+</head>
+<body>
+
+<!-- ── HUD Overlay ── -->
+<div id="hud">
+  <h2>🏙 Repo City</h2>
+  <div class="stat-row">
+    <span class="stat-label">Repositories</span>
+    <span class="stat-value">18</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label"><span class="dot"></span>Developers Active</span>
+    <span class="stat-value">36</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Commits Today</span>
+    <span class="stat-value">24</span>
+  </div>
+  <div class="stat-row" style="border-bottom:none; padding-top:10px;">
+    <button id="mr-panel-btn" onclick="toggleMRPanel()">🔀 Open MRs</button>
+  </div>
+</div>
+
+<!-- ── Open MR Panel ── -->
+<div id="mr-panel-overlay" onclick="closeMRPanel(event)">
+  <div id="mr-panel">
+    <div id="mr-panel-header">
+      <span id="mr-panel-title">🔀 Open Merge Requests</span>
+      <button id="mr-panel-close" onclick="closeMRPanelDirect()">✕</button>
+    </div>
+    <div id="mr-panel-subtitle">Click a repository to open its merge requests on GitLab</div>
+    <div id="mr-panel-total-row">
+      <span id="mr-panel-total-label">Total open</span>
+      <span id="mr-panel-total-value">—</span>
+    </div>
+    <div id="mr-panel-list"></div>
+  </div>
+</div>
+
+<!-- ── Commit Toast ── -->
+<div id="commit-toast"></div>
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+  } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// ── Renderer ──────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+// ── Label Renderer (CSS2D — floats above scene) ───────────────
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+
+// ── Repo / Attraction Config ──────────────────────────────────
+// 16 real GitLab repositories — two districts + two standalone repos
+const REPOS = [
+  // ms-partner district (10 repos)
+  { id:'msp-admin',    icon:'🛡️',  name:'ms-partner-administration',       pos:[-48, 8,  -8 ], type:'admin'      },
+  { id:'msp-atome',    icon:'⚛️',  name:'ms-partner-atome',                pos:[-48, 7,  -24], type:'atome'      },
+  { id:'msp-cb',       icon:'🔔', name:'ms-partner-callback',              pos:[-32, 7,  -36], type:'callback'   },
+  { id:'msp-cbrl',     icon:'⏱️',  name:'ms-partner-callback-rate-limiter',pos:[-48, 7,  -40], type:'cbrl'       },
+  { id:'msp-cust',     icon:'👥', name:'ms-partner-customer',              pos:[-32, 7,  -52], type:'customer'   },
+  { id:'msp-gw',       icon:'🌐', name:'ms-partner-gateway',               pos:[-16, 8,  -52], type:'gateway'    },
+  { id:'msp-int',      icon:'�', name:'ms-partner-integration-platform',  pos:[-64, 8,  -24], type:'integration'},
+  { id:'msp-reg',      icon:'📝', name:'ms-partner-registration',          pos:[-64, 7,  -40], type:'reg'        },
+  { id:'msp-txn',      icon:'�', name:'ms-partner-transaction',           pos:[-48, 9,  -56], type:'txn'        },
+  { id:'msp-web',      icon:'🖥️',  name:'ms-partner-web',                  pos:[-16, 7,  -36], type:'web'        },
+  // ms-pip district (4 repos)
+  { id:'pip-cat',      icon:'📚', name:'ms-pip-catalog',                   pos:[ 24, 7,  -36], type:'catalog'    },
+  { id:'pip-gw',       icon:'🚪', name:'ms-pip-gateway',                   pos:[ 40, 8,  -24], type:'pipgw'      },
+  { id:'pip-res',      icon:'📦', name:'ms-pip-resource',                  pos:[ 40, 7,  -40], type:'resource'   },
+  { id:'pip-txn',      icon:'💳', name:'ms-pip-transaction',               pos:[ 24, 8,  -52], type:'piptxn'     },
+  // Standalone repos
+  { id:'webview-auto', icon:'🤖', name:'partner-webview-automation-test',  pos:[ 24, 7,   20], type:'automation' },
+  { id:'partnership',  icon:'🤝', name:'partnership-automation',           pos:[ 40, 7,   20], type:'partner'    },
+  // Sunset / maintenance-mode repos
+  { id:'ginpay',       icon:'⚠️', name:'ms-ginpay',                        pos:[  8, 6,  -36], type:'sunset', sunset: true },
+  // Production Support — always hot
+  { id:'prod-support', icon:'🚨', name:'production-support',               pos:[ 20, 14,   0], type:'support', support: true },
+];
+
+// ── Floating Repo Labels (CSS2D — created after scene is ready) ──
+// Labels are attached to invisible anchor objects placed at each repo's
+// roof level; CSS2DRenderer projects them as DOM elements that always
+// face the camera. Created lazily after scene setup via a deferred array.
+const repoLabelObjects = [];   // filled below after scene exists
+
+// ── Scene & Camera ────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 80, 220);
+
+// Build one CSS2DObject label per repo and anchor it at roof height
+REPOS.forEach(repo => {
+  const div = document.createElement('div');
+  div.className = 'repo-label'
+    + (repo.sunset  ? ' repo-label--sunset'  : '')
+    + (repo.support ? ' repo-label--support' : '');
+  div.innerHTML = `<span class="repo-icon">${repo.icon}</span>${repo.name}`
+    + (repo.sunset  ? '<span class="sunset-badge">SUNSET SOON</span>'  : '')
+    + (repo.support ? '<span class="support-badge">🔴 LIVE</span>' : '');
+
+  const labelObj = new CSS2DObject(div);
+  // pos = [x, roofHeight, z] — float 2 units above the roof
+  labelObj.position.set(repo.pos[0], repo.pos[1] + 2, repo.pos[2]);
+  scene.add(labelObj);
+  repoLabelObjects.push(labelObj);
+});
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+camera.position.set(55, 30, 65);
+
+// ── Orbit Controls (mouse drag, pinch zoom, right-drag pan) ───
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1, 0);
+controls.minDistance = 8;
+controls.maxDistance = 200;
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.update();
+
+// ── WASD keyboard walk (shifts both camera + orbit target) ─────
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.code] = true;  });
+document.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+function updateCamera() {
+  if (!Object.values(keys).some(Boolean)) return;
+  const speed = 0.55;
+  // Flat forward = direction from camera to target, projected onto XZ
+  const fwd = controls.target.clone().sub(camera.position);
+  fwd.y = 0; fwd.normalize();
+  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+
+  const move = new THREE.Vector3();
+  if (keys['KeyW'] || keys['ArrowUp'])    move.addScaledVector(fwd,   speed);
+  if (keys['KeyS'] || keys['ArrowDown'])  move.addScaledVector(fwd,  -speed);
+  if (keys['KeyA'] || keys['ArrowLeft'])  move.addScaledVector(right,-speed);
+  if (keys['KeyD'] || keys['ArrowRight']) move.addScaledVector(right, speed);
+
+  // Move both camera and orbit target so the view doesn't snap
+  camera.position.add(move);
+  controls.target.add(move);
+  // Keep camera above ground
+  camera.position.y = Math.max(1.5, camera.position.y);
+}
+
+// ── Lights ────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const sun = new THREE.DirectionalLight(0xfffbe0, 1.2);
+sun.position.set(15, 25, 15);
+sun.castShadow = true;
+scene.add(sun);
+
+// ── Helpers ───────────────────────────────────────────────────
+function box(w, h, d, color, x, y, z, ry = 0) {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.position.set(x, y, z);
+  m.rotation.y = ry;
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m); return m;
+}
+function plane(w, d, color, x, y, z, ry = 0) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.rotation.x = -Math.PI / 2; m.rotation.z = ry;
+  m.position.set(x, y, z);
+  m.receiveShadow = true;
+  scene.add(m); return m;
+}
+function cyl(rt, rb, h, color, x, y, z) {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(rt, rb, h, 12),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.position.set(x, y, z);
+  m.castShadow = true; scene.add(m); return m;
+}
+function sphere(r, color, x, y, z) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 8, 6),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.position.set(x, y, z);
+  m.castShadow = true; scene.add(m); return m;
+}
+function cone(r, h, color, x, y, z) {
+  const m = new THREE.Mesh(
+    new THREE.ConeGeometry(r, h, 8),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.position.set(x, y, z);
+  m.castShadow = true; scene.add(m); return m;
+}
+// tree: trunk + sphere canopy
+function tree(x, z, h = 1.8, r = 1.1) {
+  cyl(0.18, 0.22, h, 0x7a5230, x, h * 0.5, z);
+  sphere(r, 0x2e9e2e, x, h + r * 0.75, z);
+}
+// bench: seat + backrest + two legs  (scaled to match ~0.57-tall characters)
+function bench(x, z, ry = 0) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.18), new THREE.MeshLambertMaterial({color:0x8b5e3c}));
+  seat.position.set(0, 0.18, 0); seat.castShadow=true; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.04), new THREE.MeshLambertMaterial({color:0x8b5e3c}));
+  back.position.set(0, 0.28, 0.08); back.castShadow=true; g.add(back);
+  [-0.28, 0.28].forEach(ox => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.18), new THREE.MeshLambertMaterial({color:0x6b4423}));
+    leg.position.set(ox, 0.09, 0); g.add(leg);
+  });
+  g.position.set(x, 0, z); g.rotation.y = ry;
+  scene.add(g);
+}
+// lamp post: pole + head
+function lamp(x, z) {
+  cyl(0.07, 0.09, 3.5, 0x555555, x, 1.75, z);
+  // arm
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.6), new THREE.MeshLambertMaterial({color:0x555555}));
+  arm.position.set(x, 3.55, z+0.3); arm.castShadow=true; scene.add(arm);
+  // lamp head
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18,8,6), new THREE.MeshLambertMaterial({color:0xffffcc}));
+  head.position.set(x, 3.55, z+0.6); head.castShadow=true; scene.add(head);
+}
+// small bush: low sphere cluster
+function bush(x, z) {
+  sphere(0.55, 0x3aaa3a, x,      0.45, z);
+  sphere(0.4,  0x2e8c2e, x+0.4,  0.38, z+0.1);
+  sphere(0.38, 0x36a036, x-0.35, 0.35, z-0.1);
+}
+
+// ── Ground ────────────────────────────────────────────────────
+plane(200, 200, 0x5aaa3c, 0, 0, 0);
+
+// ── Zone Ground Tiles (district quadrants, y=0.01 so they sit above grass) ──
+// ms-partner district: large NW block
+plane(72, 60, 0x3d7a5e, -44, 0.01, -34);   // ms-partner campus (NW large)
+// ms-pip district: NE block
+plane(32, 32, 0x3a6a9a,  36, 0.01, -38);   // ms-pip campus (NE)
+// Standalone zone: SE small pad
+plane(28, 14, 0x8a7a3a,  36, 0.01,  20);   // standalone repos (SE)
+
+// ── Park Grid (city-block style tiles) ───────────────────────
+(function buildGrid() {
+  const TILE = 16;         // tile size in world units
+  const HALF = 80;         // grid extends –80 … +80
+  const LINE_W = 0.12;     // line thickness
+  const LINE_H = 0.012;    // sits just above ground
+  const MAT_X  = new THREE.MeshLambertMaterial({ color: 0x4a9430 }); // E–W lines
+  const MAT_Z  = new THREE.MeshLambertMaterial({ color: 0x4a9430 }); // N–S lines
+
+  // Vertical lines (along Z axis)
+  for (let x = -HALF; x <= HALF; x += TILE) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(LINE_W, LINE_H, HALF * 2), MAT_Z);
+    m.position.set(x, LINE_H / 2, 0);
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+  // Horizontal lines (along X axis)
+  for (let z = -HALF; z <= HALF; z += TILE) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(HALF * 2, LINE_H, LINE_W), MAT_X);
+    m.position.set(0, LINE_H / 2, z);
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+})();
+
+// ── Central Plaza (round stone circle via cylinder) ───────────
+cyl(4, 4, 0.08, 0xd4c8a8, 0, 0.04, 0);
+
+// Statue at plaza center — developer figure on a pedestal
+cyl(0.55, 0.6, 0.18, 0xb8b0a0, 0, 0.09, 0);          // pedestal base slab
+cyl(0.32, 0.36, 0.55, 0xa0998a, 0, 0.45, 0);          // pedestal column
+cyl(0.42, 0.42, 0.1, 0xb8b0a0, 0, 0.75, 0);           // pedestal cap
+// figure: legs + torso + head + raised arm (bronze-ish tint)
+box(0.09, 0.22, 0.09, 0x8a7a5a, -0.05, 0.97, 0);      // leg L
+box(0.09, 0.22, 0.09, 0x8a7a5a,  0.05, 0.97, 0);      // leg R
+box(0.22, 0.24, 0.12, 0x7a6a4a,  0.0,  1.23, 0);      // torso
+box(0.07, 0.20, 0.07, 0x7a6a4a, -0.15, 1.22, 0);      // arm L (down)
+box(0.07, 0.20, 0.07, 0x7a6a4a,  0.15, 1.32, 0, -0.6);// arm R (raised)
+box(0.18, 0.18, 0.18, 0x9a8a6a,  0.0,  1.52, 0);      // head
+box(0.22, 0.07, 0.22, 0x6a5a3a,  0.0,  1.64, 0);      // hat brim
+cyl(0.08, 0.10, 0.14, 0x6a5a3a,  0.0,  1.75, 0);      // hat crown
+
+// ── Walking Paths (light brown planes) ────────────────────────
+// Main cross paths (extended to reach outer attractions at ±35)
+plane(4, 75, 0xc8a97a, 0, 0.03,  0);          // N–S
+plane(75, 4, 0xc8a97a, 0, 0.03,  0);          // E–W
+// Diagonal paths to each corner zone
+[[17, 0.03, 17], [-17, 0.03, 17], [17, 0.03, -17], [-17, 0.03, -17]].forEach(([x, y, z]) => {
+  const ang = Math.atan2(z, x);
+  plane(3, 16, 0xc8a97a, x * 0.5, y, z * 0.5, -ang + Math.PI / 2);
+});
+// Ring road connecting corner zones
+plane(4, 30, 0xc8a97a, -20, 0.03, 0);   // west side:  NW ↔ SW
+plane(4, 30, 0xc8a97a,  20, 0.03, 0);   // east side:  NE ↔ SE
+plane(30, 4, 0xc8a97a,   0, 0.03,-20);  // north side: NW ↔ NE
+plane(30, 4, 0xc8a97a,   0, 0.03, 20);  // south side: SW ↔ SE
+
+// ── Campus Road Network ───────────────────────────────────────
+// Main N–S spine through plaza into ms-partner district
+plane(3.2, 80, 0xc0bdb5,   0, 0.035, -30);    // central N–S spine
+
+// ms-partner district internal grid roads
+plane(3.2, 70, 0xc0bdb5, -16, 0.035, -32);    // N–S lane at x=–16
+plane(3.2, 70, 0xc0bdb5, -32, 0.035, -32);    // N–S lane at x=–32
+plane(3.2, 70, 0xc0bdb5, -48, 0.035, -32);    // N–S lane at x=–48
+plane(3.2, 70, 0xc0bdb5, -64, 0.035, -32);    // N–S lane at x=–64
+plane(80, 3.2, 0xc0bdb5, -36, 0.035,  -8);    // E–W lane at z=–8
+plane(80, 3.2, 0xc0bdb5, -36, 0.035, -24);    // E–W lane at z=–24
+plane(80, 3.2, 0xc0bdb5, -36, 0.035, -40);    // E–W lane at z=–40
+plane(80, 3.2, 0xc0bdb5, -36, 0.035, -56);    // E–W lane at z=–56
+
+// ms-pip district roads
+plane(3.2, 36, 0xc0bdb5,  24, 0.035, -38);    // N–S lane at x=24
+plane(3.2, 36, 0xc0bdb5,  40, 0.035, -38);    // N–S lane at x=40
+plane(40, 3.2, 0xc0bdb5,  32, 0.035, -24);    // E–W lane at z=–24
+plane(40, 3.2, 0xc0bdb5,  32, 0.035, -40);    // E–W lane at z=–40
+plane(40, 3.2, 0xc0bdb5,  32, 0.035, -56);    // E–W lane at z=–56
+
+// Standalone area road
+plane(28, 3.2, 0xc0bdb5,  36, 0.035,  12);    // E–W approach to standalone zone
+
+// Intersection pads
+[[-16,-8],[-32,-8],[-48,-8],[-64,-8],
+ [-16,-24],[-32,-24],[-48,-24],[-64,-24],
+ [-16,-40],[-32,-40],[-48,-40],[-64,-40],
+ [-16,-56],[-32,-56],[-48,-56],[-64,-56],
+ [24,-24],[40,-24],[24,-40],[40,-40],[24,-56],[40,-56]
+].forEach(([x,z]) => plane(4, 4, 0xb8b5ad, x, 0.036, z));
+
+// ── ms-partner District Buildings (10 repos) ──────────────────
+// Colours: steel-blue family for the district
+
+// ms-partner-administration  (–48, 0, –8)  — admin headquarters, large imposing block
+plane(16, 14, 0x4a7a5a, -48, 0.04, -8);
+box(12.0, 9.0, 9.0, 0x4a6a8a, -48, 4.5, -8);
+box(12.4, 0.5, 9.4, 0x334d66, -48, 9.25,-8);
+box(12.0, 0.9, 9.0, 0x2a3d55, -48, 9.95,-8);
+for (let row = 0; row < 5; row++) {
+  for (let col = 0; col < 4; col++) {
+    box(1.8, 1.2, 0.2, 0xb8d8ff, -52.5 + col*3.0, 1.2 + row*1.7, -3.45);
+  }
+}
+box(2.5, 3.5, 0.2, 0x2a3d55, -48, 1.75, -3.45);
+box(13.0, 0.3, 0.3, 0x4a6a8a, -48, 0.3, -8);
+lamp(-44, -4); lamp(-52, -4);
+tree(-54, -14, 3.5, 2.2); tree(-42, -14, 3.5, 2.2);
+
+// ms-partner-atome  (–48, 0, –24)  — compact tech office
+plane(14, 12, 0x3a6a5e, -48, 0.04, -24);
+box(9.0, 6.5, 7.5, 0x3a6a7a, -48, 3.25, -24);
+box(9.4, 0.4, 7.9, 0x2a4a5a, -48, 6.7, -24);
+box(9.0, 0.7, 7.5, 0x1e3a48, -48, 7.25, -24);
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.6, 1.3, 0.2, 0xaadeee, -51.0 + col*3.0, 1.2 + row*1.9, -20.45);
+  }
+}
+box(2.0, 3.0, 0.2, 0x1e3a48, -48, 1.5, -20.45);
+lamp(-52, -21); lamp(-44, -21);
+tree(-43, -28, 3.0, 2.0);
+
+// ms-partner-callback  (–32, 0, –36)  — medium service building
+plane(14, 12, 0x5a7a4e, -32, 0.04, -36);
+box(8.5, 7.0, 7.0, 0x5a7a6a, -32, 3.5, -36);
+box(8.9, 0.4, 7.4, 0x3a5a4a, -32, 7.2, -36);
+box(8.5, 0.7, 7.0, 0x2a4a3a, -32, 7.75, -36);
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 2; col++) {
+    box(1.8, 1.2, 0.2, 0xc8f0d8, -34.5 + col*3.5, 1.3 + row*1.6, -32.45);
+  }
+}
+box(2.0, 3.0, 0.2, 0x2a4a3a, -32, 1.5, -32.45);
+lamp(-36, -32); lamp(-28, -32);
+
+// ms-partner-callback-rate-limiter  (–48, 0, –40)  — modular tech box
+plane(14, 12, 0x4a6a7a, -48, 0.04, -40);
+box(8.0, 5.5, 7.5, 0x4a6a8a, -48, 2.75, -40);
+box(8.4, 0.35, 7.9, 0x2a4a6a, -48, 5.67, -40);
+box(8.0, 0.6, 7.5, 0x1a3a5a, -48, 6.1, -40);
+// stripe pattern on facade
+for (let row = 0; row < 3; row++) {
+  box(6.0, 0.15, 0.12, 0x6699cc, -48, 1.2 + row*1.6, -36.44);
+  for (let col = 0; col < 3; col++) {
+    box(1.4, 1.1, 0.2, 0x99ccff, -50.5 + col*2.8, 0.8 + row*1.6, -36.44);
+  }
+}
+box(2.0, 2.8, 0.2, 0x1a3a5a, -48, 1.4, -36.44);
+lamp(-52, -37); lamp(-44, -37);
+tree(-53, -44, 3.0, 2.0);
+
+// ms-partner-customer  (–32, 0, –52)  — wide customer-facing HQ
+plane(18, 14, 0x6a5a3e, -32, 0.04, -52);
+box(13.0, 6.5, 9.5, 0x7a6a5a, -32, 3.25, -52);
+box(13.4, 0.45, 9.9, 0x5a4a3a, -32, 6.72, -52);
+box(13.0, 0.7, 9.5, 0x4a3a2a, -32, 7.27, -52);
+for (let col = 0; col < 5; col++) {
+  box(1.8, 1.3, 0.2, 0xffe8cc, -35.6 + col*2.8, 2.0, -47.45);
+  box(1.8, 1.3, 0.2, 0xffe8cc, -35.6 + col*2.8, 4.5, -47.45);
+}
+box(2.5, 3.5, 0.2, 0x4a3a2a, -32, 1.75, -47.45);
+box(14.0, 0.3, 0.3, 0x7a6a5a, -32, 0.3, -52);
+lamp(-38, -48); lamp(-26, -48);
+tree(-38, -57, 3.0, 2.0);
+
+// ms-partner-gateway  (–16, 0, –52)  — gateway hub with dishes
+plane(14, 14, 0x4a6e7a, -16, 0.04, -52);
+box(9.0, 7.5, 8.0, 0x4a6a8a, -16, 3.75, -52);
+box(9.4, 0.45, 8.4, 0x2a4a6a, -16, 7.72, -52);
+box(9.0, 0.8, 8.0, 0x1a3a5a, -16, 8.35, -52);
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.6, 1.2, 0.2, 0xb0d8ff, -18.5 + col*2.5, 1.3 + row*1.7, -47.95);
+  }
+}
+box(2.0, 3.0, 0.2, 0x1a3a5a, -16, 1.5, -47.95);
+// satellite dishes on roof
+cyl(0.08, 0.1, 0.7, 0x777777, -13.5, 8.8, -49.5);
+sphere(0.5, 0xccddee, -13.5, 9.5, -49.5);
+cyl(0.08, 0.1, 0.7, 0x777777, -18.5, 8.8, -54.5);
+sphere(0.5, 0xccddee, -18.5, 9.5, -54.5);
+lamp(-20, -48); lamp(-12, -48);
+
+// ms-partner-integration-platform  (–64, 0, –24)  — large platform building
+plane(16, 14, 0x3a5a7e, -64, 0.04, -24);
+box(11.0, 8.5, 9.0, 0x3a5a7a, -64, 4.25, -24);
+box(11.4, 0.5, 9.4, 0x2a4a6a, -64, 8.75, -24);
+box(11.0, 0.9, 9.0, 0x1a3a5a, -64, 9.4, -24);
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(2.0, 1.5, 0.2, 0x88ccff, -67.5 + col*3.5, 1.5 + row*1.9, -19.45);
+  }
+}
+box(2.5, 3.5, 0.2, 0x1a3a5a, -64, 1.75, -19.45);
+box(12.0, 0.3, 0.3, 0x3a5a7a, -64, 0.3, -24);
+// integration connectors on side
+for (let i = 0; i < 4; i++) {
+  box(0.4, 0.4, 1.5, 0x5599cc, -69.7, 2.5 + i*1.8, -24);
+}
+lamp(-68, -20); lamp(-60, -20);
+tree(-70, -30, 3.5, 2.2);
+
+// ms-partner-registration  (–64, 0, –40)  — clean registration office
+plane(14, 12, 0x6a7a4a, -64, 0.04, -40);
+box(9.5, 6.0, 8.0, 0x6a7a6a, -64, 3.0, -40);
+box(9.9, 0.4, 8.4, 0x4a5a4a, -64, 6.2, -40);
+box(9.5, 0.7, 8.0, 0x3a4a3a, -64, 6.75, -40);
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.8, 1.3, 0.2, 0xd8f0c8, -67.0 + col*3.0, 1.3 + row*1.8, -35.95);
+  }
+}
+box(2.2, 3.2, 0.2, 0x3a4a3a, -64, 1.6, -35.95);
+lamp(-68, -37); lamp(-60, -37);
+tree(-70, -44, 3.0, 2.0);
+
+// ms-partner-transaction  (–48, 0, –56)  — tall transaction tower
+plane(14, 14, 0x4a6a4e, -48, 0.04, -56);
+cyl(3.2, 3.4, 1.0, 0x778877, -48, 0.5, -56);
+cyl(2.2, 2.4, 14.0, 0x5a7a5e, -48, 8.0, -56);
+cyl(4.2, 4.2, 0.6, 0x3a5a3e, -48, 15.3, -56);
+cyl(3.6, 3.6, 0.3, 0x4a6a4e, -48, 15.75, -56);
+cyl(0.2, 0.2, 4.0, 0xaaaaaa, -48, 17.9, -56);
+sphere(0.5, 0x44dd44, -48, 20.0, -56);
+[0, 1, 2, 3].forEach(i => {
+  const angle = i * Math.PI / 2;
+  const wx = -48 + Math.sin(angle) * 2.3;
+  const wz = -56 + Math.cos(angle) * 2.3;
+  box(0.8, 0.55, 0.15, 0xaaffaa, wx, 3.5,  wz, angle);
+  box(0.8, 0.55, 0.15, 0xaaffaa, wx, 7.5,  wz, angle);
+  box(0.8, 0.55, 0.15, 0xaaffaa, wx, 11.5, wz, angle);
+});
+lamp(-53, -52); lamp(-43, -52);
+tree(-42, -61, 3.5, 2.2);
+
+// ms-partner-web  (–16, 0, –36)  — modern web office
+plane(14, 12, 0x4a7a6a, -16, 0.04, -36);
+box(9.0, 7.0, 7.5, 0x4a7a8a, -16, 3.5, -36);
+box(9.4, 0.45, 7.9, 0x2a5a6a, -16, 7.22, -36);
+box(9.0, 0.8, 7.5, 0x1a4a5a, -16, 7.87, -36);
+// wide glass curtain wall
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.8, 1.4, 0.2, 0xb8eeff, -18.5 + col*3.0, 1.2 + row*1.7, -32.15);
+  }
+}
+box(2.2, 3.2, 0.2, 0x1a4a5a, -16, 1.6, -32.15);
+lamp(-20, -33); lamp(-12, -33);
+tree(-12, -42, 3.0, 2.0);
+
+// ── ms-pip District Buildings (4 repos) ───────────────────────
+// Colour theme: warm amber-orange for pip district
+
+// ms-pip-catalog  (24, 0, –36)  — library/catalog building
+plane(14, 12, 0x8a7a3e, 24, 0.04, -36);
+box(9.5, 7.5, 8.0, 0x8a7a6a, 24, 3.75, -36);
+box(9.9, 0.5, 8.4, 0x6a5a4a, 24, 7.75, -36);
+box(9.5, 0.9, 8.0, 0x5a4a3a, 24, 8.4, -36);
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.8, 1.3, 0.2, 0xffeebb, 21.5 + col*3.0, 1.4 + row*1.7, -32.0);
+  }
+}
+box(2.2, 3.2, 0.2, 0x5a4a3a, 24, 1.6, -32.0);
+// decorative columns
+cyl(0.35, 0.4, 7.6, 0x9a8a7a, 20.5, 3.8, -32.0);
+cyl(0.35, 0.4, 7.6, 0x9a8a7a, 27.5, 3.8, -32.0);
+lamp(20, -32); lamp(28, -32);
+tree(29, -42, 3.5, 2.2);
+
+// ms-pip-gateway  (40, 0, –24)  — gateway hub
+plane(14, 12, 0x7a6a3e, 40, 0.04, -24);
+box(9.0, 6.5, 7.5, 0x7a6a5a, 40, 3.25, -24);
+box(9.4, 0.4, 7.9, 0x5a4a3a, 40, 6.7, -24);
+box(9.0, 0.7, 7.5, 0x4a3a2a, 40, 7.25, -24);
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.7, 1.2, 0.2, 0xffd8aa, 37.5 + col*2.8, 1.2 + row*1.9, -20.2);
+  }
+}
+box(2.2, 3.0, 0.2, 0x4a3a2a, 40, 1.5, -20.2);
+// gateway arch
+box(0.5, 5.0, 0.5, 0x8a7a5a, 38.0, 2.5, -20.2);
+box(0.5, 5.0, 0.5, 0x8a7a5a, 42.0, 2.5, -20.2);
+box(5.0, 0.5, 0.5, 0x8a7a5a, 40.0, 5.2, -20.2);
+lamp(36, -21); lamp(44, -21);
+tree(34, -29, 3.0, 2.0);
+
+// ms-pip-resource  (40, 0, –40)  — resource storage building
+plane(14, 12, 0x6a5a3e, 40, 0.04, -40);
+box(10.0, 5.5, 8.5, 0x6a5a4a, 40, 2.75, -40);
+box(10.4, 0.4, 8.9, 0x4a3a2a, 40, 5.7, -40);
+box(10.0, 0.6, 8.5, 0x3a2a1a, 40, 6.1, -40);
+// industrial bay doors
+box(3.5, 4.5, 0.2, 0x2a1a0a, 37.0, 2.25, -35.7);
+box(3.5, 4.5, 0.2, 0x2a1a0a, 43.0, 2.25, -35.7);
+for (let i = 0; i < 3; i++) {
+  box(3.3, 0.12, 0.12, 0x4a3a2a, 37.0, 0.6 + i*1.4, -35.7);
+  box(3.3, 0.12, 0.12, 0x4a3a2a, 43.0, 0.6 + i*1.4, -35.7);
+}
+box(11.0, 0.3, 0.3, 0x6a5a4a, 40, 0.3, -40);
+lamp(35, -36); lamp(45, -36);
+
+// ms-pip-transaction  (24, 0, –52)  — transaction tower
+plane(14, 14, 0x7a6a3e, 24, 0.04, -52);
+cyl(3.0, 3.2, 1.0, 0x998855, 24, 0.5, -52);
+cyl(2.0, 2.2, 12.0, 0x7a6a4a, 24, 7.0, -52);
+cyl(3.8, 3.8, 0.55, 0x5a4a2a, 24, 13.27, -52);
+cyl(3.2, 3.2, 0.3, 0x6a5a3a, 24, 13.72, -52);
+cyl(0.18, 0.18, 3.5, 0xaaaaaa, 24, 15.6, -52);
+sphere(0.45, 0xffaa22, 24, 17.4, -52);
+[0, 1, 2, 3].forEach(i => {
+  const angle = i * Math.PI / 2;
+  const wx = 24 + Math.sin(angle) * 2.1;
+  const wz = -52 + Math.cos(angle) * 2.1;
+  box(0.75, 0.5, 0.15, 0xffdd88, wx, 3.5,  wz, angle);
+  box(0.75, 0.5, 0.15, 0xffdd88, wx, 7.0,  wz, angle);
+  box(0.75, 0.5, 0.15, 0xffdd88, wx, 10.5, wz, angle);
+});
+lamp(19, -48); lamp(29, -48);
+tree(30, -57, 3.5, 2.2);
+
+// ── Standalone Repo Buildings ─────────────────────────────────
+
+// partner-webview-automation-test  (24, 0, 20)  — testing lab
+plane(14, 12, 0x6a6a3e, 24, 0.04, 20);
+box(9.0, 5.5, 7.5, 0x6a6a5a, 24, 2.75, 20);
+box(9.4, 0.4, 7.9, 0x4a4a3a, 24, 5.7, 20);
+box(9.0, 0.7, 7.5, 0x3a3a2a, 24, 6.25, 20);
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.6, 1.2, 0.2, 0xeeeebb, 21.5 + col*2.8, 1.2 + row*1.6, 16.2);
+  }
+}
+box(2.0, 3.0, 0.2, 0x3a3a2a, 24, 1.5, 16.2);
+// test rig antennas
+cyl(0.06, 0.08, 2.0, 0x888888, 22.0, 7.0, 18.0);
+cyl(0.06, 0.08, 2.0, 0x888888, 26.0, 7.0, 18.0);
+sphere(0.18, 0xff4444, 22.0, 8.15, 18.0);
+sphere(0.18, 0x44ff44, 26.0, 8.15, 18.0);
+lamp(20, 16); lamp(28, 16);
+tree(19, 25, 3.0, 2.0);
+
+// partnership-automation  (40, 0, 20)  — automation center
+plane(14, 12, 0x5a6a3e, 40, 0.04, 20);
+box(9.0, 6.0, 7.5, 0x5a6a5a, 40, 3.0, 20);
+box(9.4, 0.4, 7.9, 0x3a4a3a, 40, 6.2, 20);
+box(9.0, 0.7, 7.5, 0x2a3a2a, 40, 6.75, 20);
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    box(1.6, 1.2, 0.2, 0xccffcc, 37.5 + col*2.8, 1.2 + row*1.7, 16.2);
+  }
+}
+box(2.0, 3.2, 0.2, 0x2a3a2a, 40, 1.6, 16.2);
+// robotic arm on roof
+cyl(0.2, 0.25, 1.5, 0x668866, 40, 7.45, 20);
+box(3.0, 0.3, 0.3, 0x558855, 40, 8.5, 20);
+sphere(0.3, 0x77aa77, 41.5, 8.5, 20);
+lamp(36, 16); lamp(44, 16);
+
+// ── ms-ginpay  (8, 0, –36)  — MAINTENANCE MODE / SUNSET ─────────────────
+// Isolated weathered building between plaza and pip district.
+// Hazard tape perimeter, boarded windows, warning sign on roof.
+plane(14, 12, 0x5a5a4a, 8, 0.04, -36);                      // cracked ground pad
+// Main block — desaturated brownish-gray "concrete"
+box(8.5, 5.5, 7.0, 0x7a7060, 8, 2.75, -36);                 // walls
+box(8.9, 0.35, 7.4, 0x5a5248, 8, 5.67, -36);                // roof slab
+box(8.5, 0.55, 7.0, 0x4a4840, 8, 6.12, -36);                // roof cap
+// Boarded-up windows (dark planks over openings)
+box(2.2, 1.5, 0.25, 0x3a2e22, 5.5,  2.5, -32.45);           // window board L row 1
+box(2.2, 1.5, 0.25, 0x3a2e22, 10.5, 2.5, -32.45);           // window board R row 1
+box(2.2, 1.5, 0.25, 0x3a2e22, 5.5,  4.5, -32.45);           // window board L row 2
+box(2.2, 1.5, 0.25, 0x3a2e22, 10.5, 4.5, -32.45);           // window board R row 2
+// Cross planks on boards
+box(2.4, 0.12, 0.12, 0x2a2018, 5.5,  2.5, -32.38);
+box(0.12, 1.6, 0.12, 0x2a2018, 5.5,  2.5, -32.38);
+box(2.4, 0.12, 0.12, 0x2a2018, 10.5, 2.5, -32.38);
+box(0.12, 1.6, 0.12, 0x2a2018, 10.5, 2.5, -32.38);
+// Entrance — bricked up door
+box(2.2, 3.2, 0.25, 0x4a4030, 8, 1.6, -32.45);
+// Hazard tape perimeter posts (alternating yellow / black)
+const hazardPostPositions = [
+  [3,  -31],[8,  -31],[13, -31],   // north row
+  [3,  -41],[8,  -41],[13, -41],   // south row
+  [3,  -34],[3,  -38],             // west side
+  [13, -34],[13, -38],             // east side
+];
+hazardPostPositions.forEach(([px, pz], idx) => {
+  const col = idx % 2 === 0 ? 0xffcc00 : 0x222222;
+  cyl(0.09, 0.1, 1.2, col, px, 0.6, pz);
+});
+// Hazard tape lines between posts (thin flat boxes)
+[[3,-31, 8,-31],[8,-31,13,-31],
+ [3,-41, 8,-41],[8,-41,13,-41],
+ [3,-31, 3,-34],[3,-38, 3,-41],
+ [13,-31,13,-34],[13,-38,13,-41]
+].forEach(([x1,z1,x2,z2]) => {
+  const mx = (x1+x2)/2, mz = (z1+z2)/2;
+  const dx = x2-x1, dz = z2-z1;
+  const len = Math.sqrt(dx*dx + dz*dz);
+  const ang = Math.atan2(dz, dx);
+  const tape = new THREE.Mesh(
+    new THREE.BoxGeometry(len, 0.06, 0.06),
+    new THREE.MeshLambertMaterial({ color: 0xffcc00 })
+  );
+  tape.position.set(mx, 1.18, mz);
+  tape.rotation.y = -ang;
+  scene.add(tape);
+});
+// Warning sign on roof — orange board + pole
+cyl(0.07, 0.09, 1.5, 0x555555, 8, 7.37, -36);               // pole
+box(2.8, 0.7, 0.12, 0xcc4400, 8, 8.2, -36);                  // sign board (orange/red)
+box(2.6, 0.5, 0.08, 0xffaa00, 8, 8.2, -36);                  // inner panel (amber)
+// Crack/damage marks on facade (thin dark slashes)
+box(0.08, 1.8, 0.08, 0x2a2a2a, 7.0,  2.0, -32.38);
+box(1.4,  0.08, 0.08, 0x2a2a2a, 9.5,  3.8, -32.38);
+
+// ── Production Support — Emergency Operations Center (EOC) ────
+// Positioned at (20, 0, 0) — prominently near the central plaza.
+// Designed as a 24/7 command tower: bright red-and-white striped
+// control tower with alert beacons, antenna mast, satellite dishes,
+// and a rooftop emergency cross — always "on" and highly visible.
+const EOC_X = 20, EOC_Z = 0;
+// Foundation concrete pad
+plane(16, 16, 0x888888, EOC_X, 0.02, EOC_Z);
+// Outer security perimeter (low red kerb)
+[[EOC_X-8, EOC_Z],[EOC_X+8, EOC_Z],[EOC_X, EOC_Z-8],[EOC_X, EOC_Z+8]].forEach(([kx,kz]) => {
+  box(16, 0.18, 0.25, 0xcc1111, kx, 0.09, kz);
+});
+// Main tower base — chunky white control room (ground floor)
+box(10, 4.5, 10, 0xdddddd, EOC_X, 2.25, EOC_Z);
+// Red accent stripe around base
+box(10.1, 0.55, 10.1, 0xcc1111, EOC_X, 0.9, EOC_Z);
+// Second floor — slightly narrower, light grey
+box(8.5, 4.0, 8.5, 0xe8e8e8, EOC_X, 6.5, EOC_Z);
+// Red stripe between floors
+box(9.0, 0.45, 9.0, 0xcc1111, EOC_X, 4.73, EOC_Z);
+// Third floor — command deck (smaller, dark tinted glass look)
+box(7.0, 3.0, 7.0, 0x1a3a5a, EOC_X, 10.0, EOC_Z);
+// Bright window panels on command deck — four sides
+box(6.0, 1.8, 0.12, 0x55aaff, EOC_X,      10.1, EOC_Z - 3.56);   // front
+box(6.0, 1.8, 0.12, 0x55aaff, EOC_X,      10.1, EOC_Z + 3.56);   // back
+box(0.12, 1.8, 6.0, 0x55aaff, EOC_X-3.56, 10.1, EOC_Z);          // left
+box(0.12, 1.8, 6.0, 0x55aaff, EOC_X+3.56, 10.1, EOC_Z);          // right
+// Red roof cap on command deck
+box(7.2, 0.4, 7.2, 0xcc1111, EOC_X, 11.7, EOC_Z);
+// Mechanical penthouse (HVAC / equipment block)
+box(4.5, 1.8, 4.5, 0xaaaaaa, EOC_X, 13.05, EOC_Z);
+
+// Central antenna mast (tall, slender)
+cyl(0.12, 0.08, 6.5, 0x888888, EOC_X, 15.15, EOC_Z);     // main mast shaft
+cyl(0.06, 0.04, 1.8, 0xcc1111, EOC_X, 18.25, EOC_Z);     // red tip
+// Horizontal antenna cross-arms (two pairs, offset vertically)
+box(5.0, 0.1, 0.1, 0x888888, EOC_X, 14.2, EOC_Z);
+box(0.1, 0.1, 5.0, 0x888888, EOC_X, 14.2, EOC_Z);
+box(4.0, 0.1, 0.1, 0x888888, EOC_X, 15.8, EOC_Z);
+box(0.1, 0.1, 4.0, 0x888888, EOC_X, 15.8, EOC_Z);
+
+// Satellite dish 1 (left side of penthouse, facing outward)
+cyl(0.07, 0.07, 0.8, 0xcccccc, EOC_X - 2.6, 13.2, EOC_Z - 1.0);    // dish arm
+box(1.4, 1.4, 0.15, 0xdddddd, EOC_X - 3.1, 13.6, EOC_Z - 1.0);     // dish face
+box(0.3, 0.3, 0.08, 0xcc1111, EOC_X - 3.1, 13.6, EOC_Z - 1.0);     // dish center
+// Satellite dish 2 (right side, angled slightly)
+cyl(0.07, 0.07, 0.8, 0xcccccc, EOC_X + 2.6, 13.2, EOC_Z + 1.0);    // dish arm
+box(1.4, 1.4, 0.15, 0xdddddd, EOC_X + 3.1, 13.6, EOC_Z + 1.0);     // dish face
+box(0.3, 0.3, 0.08, 0xcc1111, EOC_X + 3.1, 13.6, EOC_Z + 1.0);     // dish center
+
+// Roof emergency cross (large red + symbol made from two boxes)
+box(5.0, 0.35, 1.4, 0xee0000, EOC_X, 12.12, EOC_Z);    // horizontal bar
+box(1.4, 0.35, 5.0, 0xee0000, EOC_X, 12.12, EOC_Z);    // vertical bar
+// White fill for cross arms (inner bright fill so it pops)
+box(4.2, 0.36, 0.85, 0xffffff, EOC_X, 12.14, EOC_Z);
+box(0.85, 0.36, 4.2, 0xffffff, EOC_X, 12.14, EOC_Z);
+
+// Alert beacon lights on roof corners (4 red cylinders, tall and thin)
+[[-2.8,-2.8],[2.8,-2.8],[-2.8,2.8],[2.8,2.8]].forEach(([bx,bz]) => {
+  cyl(0.14, 0.14, 0.6, 0x333333, EOC_X+bx, 12.25, EOC_Z+bz);  // beacon mount
+  cyl(0.18, 0.18, 0.22, 0xff2200, EOC_X+bx, 12.75, EOC_Z+bz); // beacon dome (red)
+});
+
+// Ground-floor windows — four evenly spaced on the front face (z = EOC_Z - 5.06)
+// Two windows left of door, two windows right of door; door occupies centre.
+// Frame (white) sits flush on face, glass sits slightly proud.
+const GF_FACE_Z = EOC_Z - 5.06;
+// Left pair of windows
+box(1.7, 1.9, 0.08, 0xffffff, EOC_X - 3.8, 2.4, GF_FACE_Z);   // frame L1
+box(1.4, 1.6, 0.1,  0x55aaff, EOC_X - 3.8, 2.4, GF_FACE_Z);   // glass L1
+box(1.7, 1.9, 0.08, 0xffffff, EOC_X - 1.5, 2.4, GF_FACE_Z);   // frame L2
+box(1.4, 1.6, 0.1,  0x55aaff, EOC_X - 1.5, 2.4, GF_FACE_Z);   // glass L2
+// Right pair of windows
+box(1.7, 1.9, 0.08, 0xffffff, EOC_X + 1.5, 2.4, GF_FACE_Z);   // frame R1
+box(1.4, 1.6, 0.1,  0x55aaff, EOC_X + 1.5, 2.4, GF_FACE_Z);   // glass R1
+box(1.7, 1.9, 0.08, 0xffffff, EOC_X + 3.8, 2.4, GF_FACE_Z);   // frame R2
+box(1.4, 1.6, 0.1,  0x55aaff, EOC_X + 3.8, 2.4, GF_FACE_Z);   // glass R2
+// Central entry door — double door, centred on front face
+box(2.6, 3.4, 0.08, 0xffffff, EOC_X, 1.7, GF_FACE_Z);          // door frame (white)
+box(2.2, 3.0, 0.1,  0x111111, EOC_X, 1.6, GF_FACE_Z);          // door panel (dark)
+box(0.9, 2.6, 0.11, 0x223355, EOC_X - 0.55, 1.6, GF_FACE_Z);   // left door leaf
+box(0.9, 2.6, 0.11, 0x223355, EOC_X + 0.55, 1.6, GF_FACE_Z);   // right door leaf
+// Door handles
+box(0.08, 0.08, 0.14, 0xddaa00, EOC_X - 0.16, 1.7, GF_FACE_Z); // handle left
+box(0.08, 0.08, 0.14, 0xddaa00, EOC_X + 0.16, 1.7, GF_FACE_Z); // handle right
+
+// Generator / equipment boxes beside the building (right side)
+box(3.0, 1.4, 1.8, 0x555555, EOC_X + 7.0, 0.7, EOC_Z - 2.0);   // generator unit
+box(2.8, 1.2, 1.6, 0x444444, EOC_X + 7.0, 0.7, EOC_Z - 2.0);   // inner panel
+box(3.0, 1.4, 1.8, 0x555555, EOC_X + 7.0, 0.7, EOC_Z + 2.0);   // second unit
+cyl(0.16, 0.14, 2.2, 0x555555, EOC_X + 8.8, 1.1, EOC_Z - 1.0); // exhaust stack 1
+cyl(0.16, 0.14, 2.0, 0x555555, EOC_X + 8.8, 1.0, EOC_Z + 1.0); // exhaust stack 2
+
+// Security bollards at entrance
+[-3.5,-1.2,1.2,3.5].forEach(bx => {
+  cyl(0.18, 0.18, 1.1, 0xcc1111, EOC_X + bx, 0.55, EOC_Z - 6.2);
+  cyl(0.22, 0.22, 0.18, 0xffcc00, EOC_X + bx, 1.2, EOC_Z - 6.2); // bollard top cap
+});
+
+tree( 8,  8); tree(-8,  8); tree( 8, -8); tree(-8, -8);  // plaza corners
+tree( 0, 30); tree(30,  0); tree(0, -30);                 // path ends
+
+// ── Lamp Posts (along main paths) ────────────────────────────
+[[ 9, 0],[-9, 0],[0, 9],[0,-9]].forEach(([x,z]) => lamp(x, z));
+
+// ── Park Benches (facing inward toward plaza) ─────────────────
+bench(  6, 0,    Math.PI / 2);
+bench( -6, 0,   -Math.PI / 2);
+bench(  0,  6,   0);
+bench(  0, -6,   Math.PI);
+
+// ── Bushes around plaza ───────────────────────────────────────
+[[ 14,-14],[-14,-14],[ 14, 14],[-14, 14],
+ [  7,  0],[  -7,  0],[  0,  7],[   0, -7]].forEach(([x,z]) => bush(x, z));
+
+// ── City Parks ───────────────────────────────────────────────
+// Small neighbourhood parks placed in empty block corners between
+// roads and buildings.  Each park is a grass pad with trees,
+// benches and bushes — all scaled to match the ~0.57-tall characters.
+//
+// Helper: tiny park grass pad (sits just above the ground tile)
+function parkPad(x, z, w, d) {
+  plane(w, d, 0x4ab84a, x, 0.015, z);
+}
+
+// ── Park A: ms-partner NE corner (between x=–16 and x=–32, z=–16 to –22) ──
+// Open block between the cross-district road (z=–8) and first E–W row (z=–24)
+// and between the N–S spines at x=–16 and x=–32.  Safe gap: ~10×9 units.
+parkPad(-24, -16, 9, 7);
+tree(-26, -14, 1.9, 1.1);
+tree(-22, -18, 2.1, 1.3);
+tree(-27, -19, 1.7, 1.0);
+bush(-21, -14);
+bush(-28, -16);
+bench(-24, -15,  0);           // bench facing south
+bench(-24, -18,  Math.PI);     // bench facing north (back-to-back)
+
+// ── Park B: ms-partner mid block (x=–32 to –48, z=–16 to –22) ──
+parkPad(-40, -16, 8, 7);
+tree(-42, -14, 2.0, 1.2);
+tree(-38, -19, 1.8, 1.1);
+bush(-43, -18);
+bush(-37, -14);
+bench(-40, -16, 0);
+
+// ── Park C: ms-partner inner block (x=–16 to –32, z=–45 to –52) ──
+// Gap between the z=–40 road and the customer/web buildings near z=–52.
+parkPad(-24, -48, 8, 6);
+tree(-26, -46, 1.9, 1.1);
+tree(-22, -50, 2.0, 1.2);
+bush(-27, -50);
+bush(-22, -46);
+bench(-24, -47, 0);
+bench(-24, -50, Math.PI);
+
+// ── Park D: ms-partner far-west pocket (x=–56 to –62, z=–14 to –20) ──
+// Thin strip west of x=–64 spine, between z=–8 road and z=–24 road.
+parkPad(-60, -16, 6, 7);
+tree(-61, -14, 1.7, 1.0);
+tree(-58, -19, 1.9, 1.1);
+bush(-62, -18);
+bench(-60, -16, Math.PI / 2);
+
+// ── Park E: ms-pip inner courtyard (x=28 to 36, z=–28 to –36) ──
+// Courtyard between pip-gateway (z=–24) and pip-resource (z=–40) rows,
+// between the N–S spines at x=24 and x=40.  Central pip green space.
+parkPad(32, -32, 7, 6);
+tree(30, -30, 2.0, 1.2);
+tree(34, -34, 1.9, 1.1);
+tree(31, -34, 1.7, 1.0);
+bush(34, -30);
+bush(29, -33);
+bench(32, -31, 0);
+bench(32, -34, Math.PI);
+
+// ── Park F: standalone district pocket (x=28 to 36, z=5 to 10) ──
+// Between the standalone approach road (z=12) and the open green to
+// the north, between the two standalone buildings at x=24 and x=40.
+parkPad(32, 6, 7, 6);
+tree(30,  5, 1.8, 1.0);
+tree(34,  8, 2.0, 1.2);
+bush(31,  8);
+bush(34,  5);
+bench(32,  6, Math.PI / 2);
+
+// ── Zone District Signs ───────────────────────────────────────
+const ZONES = [
+  { label: '🤝 ms-partner',  color: 0x2a5a6a, x: -8, z: -10 },   // entrance to ms-partner
+  { label: '📦 ms-pip',      color: 0x8a6a2a, x: 12, z: -10 },   // entrance to ms-pip
+  { label: '🔧 Standalone',  color: 0x4a6a3a, x: 32, z:  10 },   // standalone repos
+];
+ZONES.forEach(z => {
+  cyl(0.07, 0.09, 2.2, 0x5a3a1a, z.x, 1.1, z.z);
+  box(2.5, 0.55, 0.12, z.color, z.x, 2.45, z.z);
+});
+
+// ── Developer Characters ──────────────────────────────────────
+// ── Road-network waypoints ────────────────────────────────────
+// Every point lies on a named road lane or intersection so characters
+// walk along visible paths.  Building entrances are included so devs
+// still visit repos, but the majority of targets are mid-road nodes.
+//
+// Road grid summary
+//   ms-partner N–S spines : x = –16, –32, –48, –64
+//   ms-partner E–W spines : z = –8, –24, –40, –56
+//   ms-pip     N–S spines : x =  24,  40
+//   ms-pip     E–W spines : z = –24, –40, –56
+//   Standalone approach   : z =  12  (x 22 → 50)
+//   Main plaza spine      : x =  0   (z  0 → –8)
+//   Cross-district link   : z = –8   (x –16 → 40)
+
+const WAYPOINTS = [
+  // ── Plaza & main spine ──
+  new THREE.Vector3(   0,  0,   0),   //  0 plaza centre
+  new THREE.Vector3(   0,  0,  -8),   //  1 plaza south exit / main spine
+  new THREE.Vector3( -16,  0,  -8),   //  2 cross-district junction (E side)
+  new THREE.Vector3( -32,  0,  -8),   //  3 cross-district junction
+  new THREE.Vector3( -48,  0,  -8),   //  4 ms-partner-administration entrance
+  new THREE.Vector3( -64,  0,  -8),   //  5 cross-district junction (W end)
+
+  // ── ms-partner E–W z=–24 ──
+  new THREE.Vector3( -16,  0, -24),   //  6
+  new THREE.Vector3( -32,  0, -24),   //  7
+  new THREE.Vector3( -48,  0, -24),   //  8 ms-partner-atome entrance
+  new THREE.Vector3( -64,  0, -24),   //  9 ms-partner-integration entrance
+
+  // ── ms-partner E–W z=–40 ──
+  new THREE.Vector3( -16,  0, -40),   // 10
+  new THREE.Vector3( -32,  0, -40),   // 11
+  new THREE.Vector3( -48,  0, -40),   // 12 ms-partner-callback-rate-limiter entrance
+  new THREE.Vector3( -64,  0, -40),   // 13 ms-partner-registration entrance
+
+  // ── ms-partner E–W z=–56 ──
+  new THREE.Vector3( -16,  0, -56),   // 14
+  new THREE.Vector3( -32,  0, -56),   // 15 ms-partner-customer entrance
+  new THREE.Vector3( -48,  0, -56),   // 16 ms-partner-transaction entrance
+  new THREE.Vector3( -64,  0, -56),   // 17
+
+  // ── ms-partner N–S mid-block nodes ──
+  new THREE.Vector3( -16,  0, -32),   // 18 x=–16 N–S mid
+  new THREE.Vector3( -32,  0, -32),   // 19 x=–32 N–S mid (near ms-partner-callback)
+  new THREE.Vector3( -32,  0, -48),   // 20 x=–32 N–S mid (near ms-partner-customer)
+  new THREE.Vector3( -48,  0, -32),   // 21 x=–48 N–S mid
+  new THREE.Vector3( -48,  0, -48),   // 22 x=–48 N–S mid
+  new THREE.Vector3( -64,  0, -32),   // 23 x=–64 N–S mid
+  new THREE.Vector3( -64,  0, -48),   // 24 x=–64 N–S mid
+  new THREE.Vector3( -16,  0, -48),   // 25 x=–16 N–S mid (near ms-partner-web/gateway)
+
+  // ── ms-pip E–W z=–24 ──
+  new THREE.Vector3(  24,  0, -24),   // 26 ms-pip NW corner
+  new THREE.Vector3(  32,  0, -24),   // 27 ms-pip E–W mid
+  new THREE.Vector3(  40,  0, -24),   // 28 ms-pip-gateway entrance
+
+  // ── ms-pip E–W z=–40 ──
+  new THREE.Vector3(  24,  0, -40),   // 29 ms-pip-catalog entrance (approx)
+  new THREE.Vector3(  32,  0, -40),   // 30 ms-pip E–W mid
+  new THREE.Vector3(  40,  0, -40),   // 31 ms-pip-resource entrance
+
+  // ── ms-pip E–W z=–56 ──
+  new THREE.Vector3(  24,  0, -56),   // 32 ms-pip-transaction entrance
+  new THREE.Vector3(  32,  0, -56),   // 33 ms-pip E–W mid
+  new THREE.Vector3(  40,  0, -56),   // 34 ms-pip SE corner
+
+  // ── ms-pip N–S mid-block nodes ──
+  new THREE.Vector3(  24,  0, -32),   // 35 x=24 N–S mid
+  new THREE.Vector3(  24,  0, -48),   // 36 x=24 N–S mid
+  new THREE.Vector3(  40,  0, -32),   // 37 x=40 N–S mid
+  new THREE.Vector3(  40,  0, -48),   // 38 x=40 N–S mid
+
+  // ── ms-pip ↔ cross-district link (z=–8, x=0→40) ──
+  new THREE.Vector3(  16,  0,  -8),   // 39 link mid-point
+  new THREE.Vector3(  32,  0,  -8),   // 40 link near ms-pip
+  new THREE.Vector3(  40,  0,  -8),   // 41 ms-pip N entrance
+
+  // ── ms-pip ↔ ms-partner link on z=–24 ──
+  new THREE.Vector3(   0,  0, -24),   // 42 link mid-point
+  new THREE.Vector3(   8,  0, -24),   // 43 link near ms-ginpay
+
+  // ── Standalone approach road (z≈12, x=22→50) ──
+  new THREE.Vector3(  22,  0,  12),   // 44 standalone road west end
+  new THREE.Vector3(  32,  0,  12),   // 45 standalone road mid
+  new THREE.Vector3(  40,  0,  12),   // 46 standalone road east end
+
+  // ── Building entrances (kept so commit events still send devs to repos) ──
+  new THREE.Vector3( -32,  0, -36),   // 47 ms-partner-callback entrance
+  new THREE.Vector3( -16,  0, -36),   // 48 ms-partner-web entrance
+  new THREE.Vector3(  24,  0, -36),   // 49 ms-pip-catalog entrance
+  new THREE.Vector3(  24,  0,  20),   // 50 partner-webview-automation-test
+  new THREE.Vector3(  40,  0,  20),   // 51 partnership-automation
+  new THREE.Vector3(   8,  0, -36),   // 52 ms-ginpay (sunset)
+  new THREE.Vector3(  20,  0,   0),   // 53 production-support (EOC)
+];
+
+// ── Road adjacency graph ──────────────────────────────────────
+// For each waypoint index, list the indices of its immediate road neighbours.
+// Only nodes connected by a single straight road segment are adjacent,
+// so characters always stay on visible paths and never cut through buildings.
+const ROAD_GRAPH = [
+  /* 0  plaza centre         */ [1, 53],
+  /* 1  plaza south / spine  */ [0, 2, 39, 42],
+  /* 2  junction x=–16 z=–8  */ [1, 3, 6],
+  /* 3  junction x=–32 z=–8  */ [2, 4, 7],
+  /* 4  administration ent.  */ [3, 5, 8],
+  /* 5  junction x=–64 z=–8  */ [4, 9],
+
+  /* 6  x=–16 z=–24          */ [2, 7, 18, 42],
+  /* 7  x=–32 z=–24          */ [6, 8, 19],
+  /* 8  atome entrance        */ [7, 9, 21],
+  /* 9  integration entrance  */ [8, 5, 23],
+
+  /* 10  x=–16 z=–40         */ [18, 11, 25],
+  /* 11  x=–32 z=–40         */ [10, 12, 19, 20],
+  /* 12  cbrl entrance        */ [11, 13, 21, 22],
+  /* 13  registration ent.    */ [12, 9, 23, 24],
+
+  /* 14  x=–16 z=–56         */ [25, 15],
+  /* 15  customer entrance    */ [14, 16, 20],
+  /* 16  transaction entrance */ [15, 17, 22],
+  /* 17  x=–64 z=–56         */ [16, 24],
+
+  /* 18  x=–16 N–S mid        */ [6, 10, 48],
+  /* 19  x=–32 N–S mid        */ [7, 11, 47],
+  /* 20  x=–32 N–S mid (S)    */ [11, 15],
+  /* 21  x=–48 N–S mid        */ [8, 12],
+  /* 22  x=–48 N–S mid (S)    */ [12, 16],
+  /* 23  x=–64 N–S mid        */ [9, 13],
+  /* 24  x=–64 N–S mid (S)    */ [13, 17],
+  /* 25  x=–16 N–S mid (S)    */ [10, 14],
+
+  /* 26  pip NW x=24 z=–24    */ [41, 27, 35, 43],
+  /* 27  pip mid x=32 z=–24   */ [26, 28],
+  /* 28  pip-gateway ent.     */ [27, 37],
+
+  /* 29  pip-catalog x=24 z=–40 */ [35, 30, 36, 49],
+  /* 30  pip mid x=32 z=–40   */ [29, 31],
+  /* 31  pip-resource ent.    */ [30, 37, 38],
+
+  /* 32  pip-txn x=24 z=–56   */ [36, 33],
+  /* 33  pip mid x=32 z=–56   */ [32, 34],
+  /* 34  pip SE x=40 z=–56    */ [33, 38],
+
+  /* 35  x=24 N–S mid         */ [26, 29],
+  /* 36  x=24 N–S mid (S)     */ [29, 32],
+  /* 37  x=40 N–S mid         */ [28, 31],
+  /* 38  x=40 N–S mid (S)     */ [31, 34],
+
+  /* 39  link mid x=16 z=–8   */ [1, 40],
+  /* 40  link x=32 z=–8       */ [39, 41],
+  /* 41  pip N entrance x=40  */ [40, 26, 28],
+
+  /* 42  link mid x=0 z=–24   */ [1, 43, 6],
+  /* 43  near ginpay x=8 z=–24*/ [42, 26, 52],
+
+  /* 44  standalone W x=22 z=12*/ [53, 45],
+  /* 45  standalone mid x=32  */ [44, 46, 50],
+  /* 46  standalone E x=40    */ [45, 51],
+
+  /* 47  callback entrance     */ [19],
+  /* 48  web entrance          */ [18],
+  /* 49  pip-catalog entrance  */ [29],
+  /* 50  partner-webview ent.  */ [45],
+  /* 51  partnership-auto ent. */ [46],
+  /* 52  ginpay (sunset) ent.  */ [43],
+  /* 53  EOC (production-sup)  */ [0, 44],
+];
+
+// ── Named Developer Characters ────────────────────────────────
+// Roles:
+//   'engineer'   — walks between all waypoints, normal speed
+//   'caretaker'  — patrols slowly near the plaza (waypoints 0 & EOC)
+//   'leader'     — strolls slowly around the plaza centre; taller, gold crown
+// Genders:
+//   'male'   — trousers + flat cap
+//   'female' — skirt + hair bun, slightly shorter torso
+
+const PEOPLE = [
+  { name:'Aditya Novandri',  gender:'male',   role:'engineer'   },
+  { name:'Agung Maulana',    gender:'male',   role:'engineer'   },
+  { name:'Agus Triantoro',   gender:'male',   role:'engineer'   },
+  { name:'Ali H',            gender:'male',   role:'engineer'   },
+  { name:'Andes',            gender:'male',   role:'engineer'   },
+  { name:'Ardi Rizmaldi',    gender:'male',   role:'engineer'   },
+  { name:'Ardy',             gender:'male',   role:'engineer'   },
+  { name:'Astrid',           gender:'female', role:'engineer'   },
+  { name:'Dani',             gender:'male',   role:'engineer'   },
+  { name:'Djamal_a_m',       gender:'male',   role:'engineer'   },
+  { name:'Edityo',           gender:'male',   role:'engineer'   },
+  { name:'Evan.Rahanda',     gender:'male',   role:'engineer'   },
+  { name:'Fina',             gender:'female', role:'engineer'   },
+  { name:'Hasan',            gender:'male',   role:'engineer'   },
+  { name:'Hedy Simamora',    gender:'male',   role:'engineer'   },
+  { name:'Hendry',           gender:'male',   role:'engineer'   },
+  { name:'Iman',             gender:'male',   role:'engineer'   },
+  { name:'Jamal SA',         gender:'male',   role:'engineer'   },
+  { name:'Kent K',           gender:'male',   role:'caretaker'  },
+  { name:'Mahen',            gender:'male',   role:'engineer'   },
+  { name:'Meicen',           gender:'female', role:'engineer'   },
+  { name:'Meita',            gender:'female', role:'caretaker'  },
+  { name:'Nabiila',          gender:'female', role:'engineer'   },
+  { name:'Naura',            gender:'female', role:'engineer'   },
+  { name:'Nita',             gender:'female', role:'engineer'   },
+  { name:'Rangga',           gender:'male',   role:'engineer'   },
+  { name:'Reyhan',           gender:'male',   role:'engineer'   },
+  { name:'Rizki Ekaputri',   gender:'female', role:'engineer'   },
+  { name:'Septebrina',       gender:'female', role:'engineer'   },
+  { name:'Sisi Maukar',      gender:'female', role:'engineer'   },
+  { name:'Taufik',           gender:'male',   role:'engineer'   },
+  { name:'Tedi Yuwono',      gender:'male',   role:'engineer'   },
+  { name:'Tommi Irawan',     gender:'male',   role:'engineer'   },
+  { name:'Wina',             gender:'female', role:'engineer'   },
+  { name:'Wira',             gender:'male',   role:'leader'     },
+  { name:'Yuni Marlina',     gender:'female', role:'engineer'   },
+];
+
+// Shirt palette — engineers cycle; caretakers green; leader gold
+const ENG_SHIRTS = [0xff4444, 0x44aaff, 0xffaa00, 0x44cc66, 0xcc44cc,
+                    0xff8800, 0x00ccaa, 0xee3366, 0x99cc00, 0x5588ff,
+                    0xff6655, 0x33bbdd, 0xdd8800, 0x55dd77, 0xbb55bb];
+
+// Caretakers only roam between plaza and the EOC support building
+const CARETAKER_WPS = [0, 53];
+
+function makePerson(person, idx, startX, startZ) {
+  const { gender, role } = person;
+  const isFemale   = gender === 'female';
+  const isLeader   = role   === 'leader';
+  const isCaretaker = role  === 'caretaker';
+
+  const skinColor  = isFemale ? 0xf7c8a0 : 0xf5c07a;
+  const shirtColor = isLeader    ? 0xddaa00
+                   : isCaretaker ? (isFemale ? 0x44bb66 : 0x228844)
+                   : ENG_SHIRTS[idx % ENG_SHIRTS.length];
+  const legColor   = isFemale ? 0xdd8888 : isLeader ? 0x222255 : 0x2255cc;
+  const hatColor   = isLeader    ? 0xffcc00
+                   : isCaretaker ? 0x88dd88
+                   : [0xffdd00,0xffffff,0xff6600,0x00dddd,0xff88cc,
+                      0xaaffaa,0xff99ff,0xffcc44,0x44ffee,0xccccff][idx % 10];
+  const scale = isLeader ? 1.25 : 1.0;
+
+  const g   = new THREE.Group();
+  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+  if (isFemale) {
+    // Skirt
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.14), mat(legColor));
+    skirt.position.set(0, 0.1, 0); g.add(skirt);
+    const shL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), mat(0x333333));
+    shL.position.set(-0.05, 0.03, 0); g.add(shL);
+    const shR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), mat(0x333333));
+    shR.position.set( 0.05, 0.03, 0); g.add(shR);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.18, 0.10), mat(shirtColor));
+    torso.position.set(0, 0.29, 0); g.add(torso);
+    const aL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.06), mat(shirtColor));
+    aL.position.set(-0.13, 0.28, 0); g.add(aL);
+    const aR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.06), mat(shirtColor));
+    aR.position.set( 0.13, 0.28, 0); g.add(aR);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), mat(skinColor));
+    head.position.set(0, 0.46, 0); g.add(head);
+    // Hair bun
+    const bun = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), mat(0x3a2010));
+    bun.position.set(0, 0.57, -0.03); g.add(bun);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.04, 0.04), mat(0xee6699));
+    band.position.set(0, 0.545, -0.03); g.add(band);
+
+    g.scale.setScalar(scale);
+    g.position.set(startX, 0, startZ);
+    scene.add(g);
+
+    // Floating name chip
+    const div = document.createElement('div');
+    div.className = 'dev-name dev-name--female' + (isCaretaker ? ' dev-name--caretaker' : '');
+    div.textContent = person.name;
+    const lObj = new CSS2DObject(div);
+    lObj.position.set(0, 0.78 * scale, 0);
+    g.add(lObj);
+
+    return { group: g, lL: skirt, lR: shL, aL, aR, role, isStationary: false, name: person.name };
+
+  } else {
+    // Male legs
+    const lL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.18, 0.09), mat(legColor));
+    lL.position.set(-0.05, 0.09, 0); g.add(lL);
+    const lR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.18, 0.09), mat(legColor));
+    lR.position.set( 0.05, 0.09, 0); g.add(lR);
+    const torso = new THREE.Mesh(
+      new THREE.BoxGeometry(isLeader ? 0.23 : 0.2, isLeader ? 0.22 : 0.2, 0.11),
+      mat(shirtColor)
+    );
+    torso.position.set(0, 0.28, 0); g.add(torso);
+    const aL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.17, 0.07), mat(shirtColor));
+    aL.position.set(-0.14, 0.27, 0); g.add(aL);
+    const aR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.17, 0.07), mat(shirtColor));
+    aR.position.set( 0.14, 0.27, 0); g.add(aR);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.17, 0.17), mat(skinColor));
+    head.position.set(0, 0.46, 0); g.add(head);
+
+    if (isLeader) {
+      // Gold crown brim + 3 spikes + gem
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.05, 0.23), mat(0xffcc00));
+      crown.position.set(0, 0.565, 0); g.add(crown);
+      [-0.07, 0, 0.07].forEach(cx => {
+        const spike = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.05), mat(0xffdd33));
+        spike.position.set(cx, 0.635, 0); g.add(spike);
+      });
+      const gem = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), mat(0xff4444));
+      gem.position.set(0, 0.695, -0.06); g.add(gem);
+    } else {
+      // Flat cap + brim
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.2), mat(hatColor));
+      cap.position.set(0, 0.565, 0); g.add(cap);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.12), mat(hatColor));
+      brim.position.set(0, 0.538, -0.06); g.add(brim);
+    }
+
+    g.scale.setScalar(scale);
+    if (isLeader) {
+      // Seat Wira on the south plaza bench at (0, 0, -6), rotation Math.PI
+      g.position.set(startX, 0.18, startZ);   // sit on seat (y=0.18)
+      g.rotation.y = Math.PI;                  // face inward toward statue
+      lL.rotation.x = -Math.PI / 2;            // legs bent horizontal
+      lR.rotation.x = -Math.PI / 2;
+      lL.position.set(-0.05, 0.0,  0.09);      // thighs project forward
+      lR.position.set( 0.05, 0.0,  0.09);
+      aL.rotation.x =  0.5;                    // arms rest on lap
+      aR.rotation.x =  0.5;
+    } else {
+      g.position.set(startX, 0, startZ);
+    }
+    scene.add(g);
+
+    // Floating name chip
+    const div = document.createElement('div');
+    div.className = 'dev-name'
+      + (isLeader    ? ' dev-name--leader'    : '')
+      + (isCaretaker ? ' dev-name--caretaker' : '');
+    div.textContent = isLeader ? '👑 ' + person.name : person.name;
+    const lObj = new CSS2DObject(div);
+    lObj.position.set(0, (isLeader ? 0.88 : 0.72) * scale, 0);
+    g.add(lObj);
+
+    return { group: g, lL, lR, aL, aR, role, isStationary: isLeader, name: person.name };
+  }
+}
+
+// Build all 36 developers
+const devs = PEOPLE.map((person, i) => {
+  const { role } = person;
+  let startWP, ox, oz;
+  if (role === 'leader') {
+    // Place Wira directly on the south plaza bench
+    startWP = { x: 0, z: -6 }; ox = 0; oz = 0;
+  } else if (role === 'caretaker') {
+    startWP = WAYPOINTS[0];
+    ox = ((i % 3) - 1) * 1.5;
+    oz = ((i % 2)     ) * 1.5 - 0.75;
+  } else {
+    startWP = WAYPOINTS[i % WAYPOINTS.length];
+    ox = ((i % 5) - 2) * 1.3;
+    oz = (Math.floor(i / 5) % 3 - 1) * 1.3;
+  }
+  const parts = makePerson(person, i, startWP.x + ox, startWP.z + oz);
+  const targetIdx = role === 'leader'    ? 0   // stationary — target ignored
+                  : role === 'caretaker' ? CARETAKER_WPS[i % CARETAKER_WPS.length]
+                  : (i + 3) % WAYPOINTS.length;
+  const speed = role === 'engineer'  ? 0.014 + (i % 8) * 0.002
+              : role === 'caretaker' ? 0.007 + (i % 3) * 0.001
+              : 0;   // leader: seated, never moves
+  return { ...parts, targetIdx, speed, phase: i * 0.8 };
+});
+
+// ── Commit Event Simulation ───────────────────────────────────
+// GitLab group base — change this once to point to the real group
+const GITLAB_BASE = 'https://gitlab.com/kreasipositif';
+
+const STRUCTURES = [
+  { waypointIdx:  4, repo: 'ms-partner-administration',       type: 'admin',       icon:'🛡️',  openMRs: 3,  gitlabUrl: `${GITLAB_BASE}/ms-partner-administration/-/merge_requests`       },
+  { waypointIdx:  8, repo: 'ms-partner-atome',                type: 'atome',       icon:'⚛️',  openMRs: 1,  gitlabUrl: `${GITLAB_BASE}/ms-partner-atome/-/merge_requests`                },
+  { waypointIdx: 47, repo: 'ms-partner-callback',             type: 'callback',    icon:'🔔', openMRs: 5,  gitlabUrl: `${GITLAB_BASE}/ms-partner-callback/-/merge_requests`             },
+  { waypointIdx: 12, repo: 'ms-partner-callback-rate-limiter',type: 'cbrl',        icon:'⏱️',  openMRs: 2,  gitlabUrl: `${GITLAB_BASE}/ms-partner-callback-rate-limiter/-/merge_requests` },
+  { waypointIdx: 15, repo: 'ms-partner-customer',             type: 'customer',    icon:'👥', openMRs: 4,  gitlabUrl: `${GITLAB_BASE}/ms-partner-customer/-/merge_requests`             },
+  { waypointIdx: 14, repo: 'ms-partner-gateway',              type: 'gateway',     icon:'🌐', openMRs: 0,  gitlabUrl: `${GITLAB_BASE}/ms-partner-gateway/-/merge_requests`              },
+  { waypointIdx:  9, repo: 'ms-partner-integration-platform', type: 'integration', icon:'🔗', openMRs: 7,  gitlabUrl: `${GITLAB_BASE}/ms-partner-integration-platform/-/merge_requests`  },
+  { waypointIdx: 13, repo: 'ms-partner-registration',         type: 'reg',         icon:'📝', openMRs: 2,  gitlabUrl: `${GITLAB_BASE}/ms-partner-registration/-/merge_requests`          },
+  { waypointIdx: 16, repo: 'ms-partner-transaction',          type: 'txn',         icon:'💱', openMRs: 6,  gitlabUrl: `${GITLAB_BASE}/ms-partner-transaction/-/merge_requests`           },
+  { waypointIdx: 48, repo: 'ms-partner-web',                  type: 'web',         icon:'🖥️',  openMRs: 1,  gitlabUrl: `${GITLAB_BASE}/ms-partner-web/-/merge_requests`                  },
+  { waypointIdx: 49, repo: 'ms-pip-catalog',                  type: 'catalog',     icon:'📚', openMRs: 3,  gitlabUrl: `${GITLAB_BASE}/ms-pip-catalog/-/merge_requests`                  },
+  { waypointIdx: 28, repo: 'ms-pip-gateway',                  type: 'pipgw',       icon:'🚪', openMRs: 0,  gitlabUrl: `${GITLAB_BASE}/ms-pip-gateway/-/merge_requests`                  },
+  { waypointIdx: 31, repo: 'ms-pip-resource',                 type: 'resource',    icon:'📦', openMRs: 2,  gitlabUrl: `${GITLAB_BASE}/ms-pip-resource/-/merge_requests`                 },
+  { waypointIdx: 32, repo: 'ms-pip-transaction',              type: 'piptxn',      icon:'💳', openMRs: 4,  gitlabUrl: `${GITLAB_BASE}/ms-pip-transaction/-/merge_requests`              },
+  { waypointIdx: 50, repo: 'partner-webview-automation-test', type: 'automation',  icon:'🤖', openMRs: 1,  gitlabUrl: `${GITLAB_BASE}/partner-webview-automation-test/-/merge_requests`  },
+  { waypointIdx: 51, repo: 'partnership-automation',          type: 'partner',     icon:'🤝', openMRs: 0,  gitlabUrl: `${GITLAB_BASE}/partnership-automation/-/merge_requests`           },
+  { waypointIdx: 52, repo: 'ms-ginpay',                       type: 'sunset',      icon:'⚠️', openMRs: 0,  gitlabUrl: `${GITLAB_BASE}/ms-ginpay/-/merge_requests`                       },
+  { waypointIdx: 53, repo: 'production-support',              type: 'support',     icon:'🚨', openMRs: 8,  gitlabUrl: `${GITLAB_BASE}/production-support/-/merge_requests`              },
+];
+
+// ── Commit Activity Indicators (CSS2D hammer icons, one per structure) ──
+// Each structure gets a floating 🔨 sprite anchored above its roof.
+// Kept hidden until a commit targets that building; bobbing + auto-hide
+// are handled entirely inside animate().
+
+// Build a type→REPOS lookup so we can find building world positions
+const REPO_BY_TYPE = {};
+REPOS.forEach(r => { REPO_BY_TYPE[r.type] = r; });
+
+STRUCTURES.forEach(s => {
+  const wp  = WAYPOINTS[s.waypointIdx];
+  const rep = REPO_BY_TYPE[s.type];
+  // Roof centre: use REPOS pos if available, else fall back to waypoint XZ
+  const bx  = rep ? rep.pos[0] : wp.x;
+  const by  = rep ? rep.pos[1] : 7;
+  const bz  = rep ? rep.pos[2] : wp.z;
+
+  // ── Floating 🔨 indicator ────────────────────────────────────
+  // Anchor sits ~3 units above the label height (well above the roof)
+  const anchor = new THREE.Object3D();
+  anchor.position.set(bx, by + 3, bz);
+  scene.add(anchor);
+
+  const el = document.createElement('div');
+  el.className = 'commit-indicator hidden';
+  el.textContent = '🔨';
+  const label = new CSS2DObject(el);
+  anchor.add(label);
+
+  // ── Point light — warm yellow, starts at intensity 0 ─────────
+  const light = new THREE.PointLight(0xffdd66, 0, 28, 1.4);
+  light.position.set(bx, by + 1, bz);
+  scene.add(light);
+
+  // ── Emissive glow windows — 4 small planes on the front face ──
+  // Placed at mid-height on the building's south-facing facade.
+  // MeshStandardMaterial is needed for emissive; we swap only these meshes.
+  const glowWindows = [];
+  const winY   = by * 0.45;           // roughly mid-facade height
+  const faceZ  = bz - (by * 0.45);    // approximate front face offset
+  const winCol = new THREE.Color(0xffee88);
+  for (let i = 0; i < 4; i++) {
+    const wx = bx + (i - 1.5) * 1.4;
+    const mat = new THREE.MeshStandardMaterial({
+      color:          0xffee88,
+      emissive:       winCol,
+      emissiveIntensity: 0,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.7), mat);
+    mesh.position.set(wx, winY, faceZ);
+    mesh.castShadow = false;
+    scene.add(mesh);
+    glowWindows.push(mesh);
+  }
+
+  s.indicator   = { anchor, el, active: false, timer: null, bobOffset: Math.random() * Math.PI * 2 };
+  s.commitLight = { light, glowWindows, intensity: 0, active: false, fadeOut: false };
+
+  // ── Vertical light beam — additive cyan cylinder ──────────────
+  // A tall transparent cylinder rising from the rooftop, visible citywide.
+  // Additive blending means it glows brightly without darkening surroundings.
+  const BEAM_H  = 100;
+  const beamMat = new THREE.MeshBasicMaterial({
+    color:       0x44ddff,
+    transparent: true,
+    opacity:     0,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.DoubleSide,
+  });
+  const beamMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 2.5, BEAM_H, 10, 1, true),
+    beamMat
+  );
+  beamMesh.position.set(bx, by + BEAM_H / 2, bz);
+  beamMesh.renderOrder = 1;
+  scene.add(beamMesh);
+  s.beam = { mesh: beamMesh, mat: beamMat, opacity: 0, active: false, fadeOut: false };
+
+  // ── Floating 🔀 MR indicator ─────────────────────────────────
+  const mrAnchor = new THREE.Object3D();
+  mrAnchor.position.set(bx + 1.4, by + 3, bz);   // offset slightly so it doesn't overlap 🔨
+  scene.add(mrAnchor);
+
+  const mrEl = document.createElement('div');
+  mrEl.className = 'mr-indicator hidden';
+  mrEl.textContent = '🔀';
+  const mrLabel = new CSS2DObject(mrEl);
+  mrAnchor.add(mrLabel);
+
+  // ── MR vertical beam — additive magenta/purple cylinder ──────
+  const MR_BEAM_H = 100;
+  const mrBeamMat = new THREE.MeshBasicMaterial({
+    color:       0xcc44ff,
+    transparent: true,
+    opacity:     0,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.DoubleSide,
+  });
+  const mrBeamMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 2.5, MR_BEAM_H, 10, 1, true),
+    mrBeamMat
+  );
+  mrBeamMesh.position.set(bx, by + MR_BEAM_H / 2, bz);
+  mrBeamMesh.renderOrder = 1;
+  scene.add(mrBeamMesh);
+
+  s.mrIndicator = { anchor: mrAnchor, el: mrEl, active: false, timer: null,
+                    bobOffset: Math.random() * Math.PI * 2 };
+  s.mrBeam      = { mesh: mrBeamMesh, mat: mrBeamMat, opacity: 0, active: false, fadeOut: false };
+
+  // ── Merge Success visuals (✅ + green beam + optional burst) ──
+  const mergedAnchor = new THREE.Object3D();
+  mergedAnchor.position.set(bx - 1.4, by + 3, bz); // opposite side of MR icon
+  scene.add(mergedAnchor);
+
+  const mergedEl = document.createElement('div');
+  mergedEl.className = 'merged-indicator hidden';
+  mergedEl.textContent = '✅';
+  const mergedLabel = new CSS2DObject(mergedEl);
+  mergedAnchor.add(mergedLabel);
+
+  const SUCCESS_BEAM_H = 60;
+  const successBeamMat = new THREE.MeshBasicMaterial({
+    color:       0x66ff88,
+    transparent: true,
+    opacity:     0,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.DoubleSide,
+  });
+  const successBeamMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25, 1.6, SUCCESS_BEAM_H, 10, 1, true),
+    successBeamMat
+  );
+  successBeamMesh.position.set(bx, by + SUCCESS_BEAM_H / 2, bz);
+  successBeamMesh.renderOrder = 1;
+  scene.add(successBeamMesh);
+
+  s.mergedIndicator = { anchor: mergedAnchor, el: mergedEl, active: false, timer: null, bobOffset: Math.random() * Math.PI * 2 };
+  s.mergedBeam = { mesh: successBeamMesh, mat: successBeamMat, opacity: 0, active: false, fadeOut: false };
+});
+
+const toast   = document.getElementById('commit-toast');
+let   toastTimer = null;
+
+// active pulse state: { type, intensity (0→1 decaying) }
+let activePulse = null;
+
+function showToast(msg, duration = 2800) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  toast.classList.remove('show');
+}
+
+// ── Commit visual helpers — always activate / deactivate together ──
+// activateCommit starts ALL three indicators (toast, hammer, beam) at once.
+// deactivateCommit stops ALL three at once.
+// showToast is never called outside these two helpers.
+function activateCommit(struct, toastMsg) {
+  // Toast — stays up for the full work duration (7 s) + a short grace period
+  showToast(toastMsg, 7500);
+
+  // Hammer indicator
+  const ind = struct.indicator;
+  clearTimeout(ind.timer);
+  ind.el.classList.remove('hidden');
+  ind.active = true;
+
+  // Building glow light + windows
+  const cl = struct.commitLight;
+  cl.active    = true;
+  cl.fadeOut   = false;
+  cl.intensity = 0;          // ramps up in animate()
+
+  // Vertical beam
+  const bm = struct.beam;
+  bm.active   = true;
+  bm.fadeOut  = false;
+  bm.opacity  = 0;           // ramps up in animate()
+}
+
+function deactivateCommit(struct) {
+  // Hide toast immediately when commit finishes
+  hideToast();
+
+  // Fade out beam
+  struct.beam.fadeOut = true;
+
+  // Fade out glow light + windows
+  struct.commitLight.fadeOut = true;
+
+  // Hide hammer — CSS opacity transition handles the visual fade
+  const ind = struct.indicator;
+  ind.el.classList.add('hidden');
+  clearTimeout(ind.timer);
+  ind.timer = setTimeout(() => {
+    ind.active = false;
+    ind.anchor.position.y = struct.commitLight.light.position.y + 3;
+  }, 500);
+}
+
+// ── Merge Request flow line ────────────────────────────────────
+// A glowing tube that animates from the developer outward to the repository
+// over ~1.5 s, then disappears as the MR beam/icon appear.
+const activeMRFlows = [];
+
+function spawnMRFlow(devGroup, repoPos) {
+  const from = devGroup.position.clone();
+  const to   = new THREE.Vector3(repoPos.x, from.y, repoPos.z); // keep Y flat
+
+  // Build the full tube along the path
+  const curve = new THREE.LineCurve3(from, to);
+  const geo   = new THREE.TubeGeometry(curve, 12, 0.22, 6, false);
+  const mat   = new THREE.MeshBasicMaterial({
+    color:      0xcc44ff,
+    transparent: true,
+    opacity:    0.85,
+    depthWrite: false,
+    blending:   THREE.AdditiveBlending,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+
+  // Pivot sits at the developer end so scaleX (along tube) grows outward
+  // The tube geometry itself is already in world space — no pivot trick needed
+  // Instead we'll clip via opacity + a progress-driven "mask" by rebuilding
+  // the curve end point each frame (only 2 control points = cheap).
+  mesh.renderOrder = 2;
+  scene.add(mesh);
+
+  activeMRFlows.push({ mesh, mat, geo, from, to, progress: 0 });
+}
+
+// ── Merge Request visual helpers ──────────────────────────────
+function activateMR(struct, toastMsg) {
+  showToast(toastMsg, 7500);
+
+  // 🔀 icon
+  const ind = struct.mrIndicator;
+  clearTimeout(ind.timer);
+  ind.el.classList.remove('hidden');
+  ind.active = true;
+
+  // Purple beam
+  const bm = struct.mrBeam;
+  bm.active  = true;
+  bm.fadeOut = false;
+  bm.opacity = 0;   // ramps up in animate()
+}
+
+function deactivateMR(struct) {
+  hideToast();
+
+  // Fade out purple beam
+  struct.mrBeam.fadeOut = true;
+
+  // Hide 🔀 icon
+  const ind = struct.mrIndicator;
+  ind.el.classList.add('hidden');
+  clearTimeout(ind.timer);
+  ind.timer = setTimeout(() => {
+    ind.active = false;
+    ind.anchor.position.y = struct.commitLight.light.position.y + 3;
+  }, 500);
+}
+
+// ── Merge Success helpers ─────────────────────────────────────
+function activateMergeSuccess(struct, toastMsg) {
+  // Show toast for merge success
+  showToast(toastMsg, 4000);
+
+  // Success icon
+  const ind = struct.mergedIndicator;
+  clearTimeout(ind.timer);
+  ind.el.classList.remove('hidden');
+  ind.active = true;
+
+  // Green success beam
+  const bm = struct.mergedBeam;
+  bm.active  = true;
+  bm.fadeOut = false;
+  bm.opacity = 0; // ramps up in animate()
+}
+
+function deactivateMergeSuccess(struct) {
+  // Fade out green beam
+  struct.mergedBeam.fadeOut = true;
+
+  // Hide ✅ icon
+  const ind = struct.mergedIndicator;
+  ind.el.classList.add('hidden');
+  clearTimeout(ind.timer);
+  ind.timer = setTimeout(() => {
+    ind.active = false;
+    ind.anchor.position.y = struct.commitLight.light.position.y + 3;
+  }, 500);
+}
+
+function triggerMergeSuccess(struct, dev) {
+  // Hide MR visuals without touching the toast (we'll show a new toast)
+  if (struct.mrBeam) struct.mrBeam.fadeOut = true;
+  if (struct.mrIndicator) {
+    struct.mrIndicator.el.classList.add('hidden');
+    clearTimeout(struct.mrIndicator.timer);
+    struct.mrIndicator.timer = setTimeout(() => { struct.mrIndicator.active = false; }, 500);
+  }
+
+  // Small burst effect at rooftop
+  const wp = WAYPOINTS[struct.waypointIdx];
+  const rep = REPO_BY_TYPE[struct.type];
+  const bx  = rep ? rep.pos[0] : wp.x;
+  const by  = rep ? rep.pos[1] : 7;
+  const bz  = rep ? rep.pos[2] : wp.z;
+
+  const burstGeo = new THREE.SphereGeometry(0.3, 8, 8);
+  const burstMat = new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
+  const burst = new THREE.Mesh(burstGeo, burstMat);
+  burst.position.set(bx, by + 2.5, bz);
+  scene.add(burst);
+
+  // Animate burst: scale up and fade over ~1s then remove
+  const burstStart = Date.now();
+  const burstTimer = setInterval(() => {
+    const p = (Date.now() - burstStart) / 1000;
+    if (p >= 1.0) {
+      clearInterval(burstTimer);
+      scene.remove(burst);
+      burstGeo.dispose();
+      burstMat.dispose();
+      // After burst, show success icon & beam
+      const mergedMsg = `✅ ${dev.name} merged a merge request in ${struct.repo}`;
+      activateMergeSuccess(struct, mergedMsg);
+      // Keep success visuals for 3s then hide
+      setTimeout(() => { deactivateMergeSuccess(struct); }, 3000);
+    } else {
+      const scale = 1 + p * 2.0;
+      burst.scale.setScalar(scale);
+      burstMat.opacity = 1 - p;
+    }
+  }, 16);
+}
+
+// ── Commit simulation state ────────────────────────────────────
+// A "commit job" tracks the developer sent to work, the target structure,
+// and whether the dev has arrived and started their "work pause".
+let activeJobs = [];   // array so multiple commits can overlap
+
+function fireCommitEvent() {
+  // Pick a random non-stationary developer and a random structure
+  const eligible = devs.filter(d => !d.isStationary && d.role !== 'caretaker');
+  if (eligible.length === 0) return;
+  const dev    = eligible[Math.floor(Math.random() * eligible.length)];
+  const struct = STRUCTURES[Math.floor(Math.random() * STRUCTURES.length)];
+
+  // Send the developer to that building's waypoint
+  dev.targetIdx  = struct.waypointIdx;
+  dev.commitJob  = null;   // clear any previous job so arrival logic resets
+
+  // Register the job (arrival check happens in animate)
+  const job = { dev, struct, arrived: false, workTimer: null,
+                toastMsg: `👨‍💻 ${dev.name} committed to ${struct.repo}` };
+  dev.commitJob = job;
+  activeJobs.push(job);
+
+  // Start a pulse on the target structure (intensity decays in animate())
+  activePulse = { type: struct.type, intensity: 1.0 };
+}
+
+// Fire first event after 2 s, then every 5–8 s (randomised interval)
+function scheduleNext() {
+  const delay = 5000 + Math.random() * 3000;
+  setTimeout(() => { fireCommitEvent(); scheduleNext(); }, delay);
+}
+setTimeout(() => { fireCommitEvent(); scheduleNext(); }, 2000);
+
+// ── Merge Request Event Simulation ───────────────────────────
+let activeMRJobs = [];   // same pattern as activeJobs
+
+function fireMREvent() {
+  const eligible = devs.filter(d => !d.isStationary && d.role !== 'caretaker');
+  if (eligible.length === 0) return;
+  const dev    = eligible[Math.floor(Math.random() * eligible.length)];
+  const struct = STRUCTURES[Math.floor(Math.random() * STRUCTURES.length)];
+
+  dev.targetIdx = struct.waypointIdx;
+  dev.mrJob     = null;
+
+  const job = { dev, struct, arrived: false, workTimer: null,
+                toastMsg: `🔀 ${dev.name} opened a merge request in ${struct.repo}` };
+  dev.mrJob = job;
+  activeMRJobs.push(job);
+}
+
+// Fire first MR event after 3.5 s, then every 8–12 s (offset from commits)
+function scheduleMRNext() {
+  const delay = 8000 + Math.random() * 4000;
+  setTimeout(() => { fireMREvent(); scheduleMRNext(); }, delay);
+}
+setTimeout(() => { fireMREvent(); scheduleMRNext(); }, 3500);
+
+// ── Animation Loop ────────────────────────────────────────────
+let t = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.016;
+
+  if (activePulse) {
+    activePulse.intensity -= 0.005;
+    if (activePulse.intensity <= 0) activePulse = null;
+  }
+
+  // ── Bob active commit indicators ──────────────────────────────
+  STRUCTURES.forEach(s => {
+    const ind = s.indicator;
+    if (!ind.active) return;
+    ind.anchor.position.y = s.commitLight.light.position.y + 3
+                          + Math.sin(t * 2.5 + ind.bobOffset) * 0.35;
+  });
+
+  // ── Animate building commit glow lights ───────────────────────
+  STRUCTURES.forEach(s => {
+    const cl = s.commitLight;
+    if (!cl.active) return;
+
+    if (cl.fadeOut) {
+      // Decay intensity back to zero
+      cl.intensity = Math.max(0, cl.intensity - 0.018);
+      if (cl.intensity === 0) {
+        cl.active  = false;
+        cl.fadeOut = false;
+      }
+    } else {
+      // Ramp up quickly then pulse slowly
+      if (cl.intensity < 1.0) {
+        cl.intensity = Math.min(1.0, cl.intensity + 0.04);
+      }
+      // Slow pulse on top of base intensity: ±0.25 at 1.2 Hz
+      cl.intensity = Math.max(0.5, Math.min(1.2,
+        cl.intensity + Math.sin(t * 1.2 * Math.PI) * 0.003
+      ));
+    }
+
+    // Apply to point light
+    cl.light.intensity = cl.intensity * 3.5;
+
+    // Apply emissive intensity to glow windows
+    const emv = cl.intensity * 1.1;
+    cl.glowWindows.forEach(w => {
+      w.material.emissiveIntensity = emv;
+    });
+  });
+
+  // ── Animate vertical light beams ──────────────────────────────
+  STRUCTURES.forEach(s => {
+    const bm = s.beam;
+    if (!bm.active) return;
+
+    if (bm.fadeOut) {
+      bm.opacity = Math.max(0, bm.opacity - 0.014);
+      if (bm.opacity === 0) {
+        bm.active  = false;
+        bm.fadeOut = false;
+      }
+    } else {
+      // Ramp up to max opacity then pulse gently
+      if (bm.opacity < 0.32) {
+        bm.opacity = Math.min(0.32, bm.opacity + 0.016);
+      }
+      // Gentle slow pulse ±0.06 at ~0.8 Hz
+      bm.opacity = Math.max(0.14, Math.min(0.38,
+        bm.opacity + Math.sin(t * 0.8 * Math.PI) * 0.002
+      ));
+    }
+    bm.mat.opacity = bm.opacity;
+  });
+
+  // ── Bob active MR indicators ───────────────────────────────────
+  STRUCTURES.forEach(s => {
+    const ind = s.mrIndicator;
+    if (!ind.active) return;
+    ind.anchor.position.y = s.commitLight.light.position.y + 3
+                          + Math.sin(t * 2.0 + ind.bobOffset) * 0.35;
+  });
+
+  // ── Animate MR light beams (purple) ──────────────────────────
+  STRUCTURES.forEach(s => {
+    const bm = s.mrBeam;
+    if (!bm.active) return;
+
+    if (bm.fadeOut) {
+      bm.opacity = Math.max(0, bm.opacity - 0.014);
+      if (bm.opacity === 0) {
+        bm.active  = false;
+        bm.fadeOut = false;
+      }
+    } else {
+      if (bm.opacity < 0.32) {
+        bm.opacity = Math.min(0.32, bm.opacity + 0.016);
+      }
+      bm.opacity = Math.max(0.14, Math.min(0.38,
+        bm.opacity + Math.sin(t * 0.65 * Math.PI) * 0.002
+      ));
+    }
+    bm.mat.opacity = bm.opacity;
+  });
+
+  // ── Animate Merge Success beams (green) & bobbing ✅ icons ───
+  STRUCTURES.forEach(s => {
+    // bob ✅ icon
+    const mind = s.mergedIndicator;
+    if (mind && mind.active) {
+      mind.anchor.position.y = s.commitLight.light.position.y + 3
+                            + Math.sin(t * 2.2 + mind.bobOffset) * 0.35;
+    }
+
+    // green beam
+    const sb = s.mergedBeam;
+    if (!sb || !sb.active) return;
+
+    if (sb.fadeOut) {
+      sb.opacity = Math.max(0, sb.opacity - 0.02);
+      if (sb.opacity === 0) {
+        sb.active  = false;
+        sb.fadeOut = false;
+      }
+    } else {
+      if (sb.opacity < 0.28) sb.opacity = Math.min(0.28, sb.opacity + 0.02);
+      sb.opacity = Math.max(0.12, Math.min(0.34, sb.opacity + Math.sin(t * 0.9 * Math.PI) * 0.002));
+    }
+    sb.mat.opacity = sb.opacity;
+  });
+
+  // ── Animate MR flow lines ─────────────────────────────────────
+  // Each frame: advance progress 0→1 over ~1.5 s (≈0.011/frame at 60fps),
+  // rebuild the short tube geometry so the glowing line grows from dev→repo.
+  for (let i = activeMRFlows.length - 1; i >= 0; i--) {
+    const f = activeMRFlows[i];
+    f.progress = Math.min(1, f.progress + 0.011);
+
+    // Lerp the current end point along from→to
+    const curEnd = f.from.clone().lerp(f.to, f.progress);
+
+    // Rebuild geometry only when the tip is still moving
+    if (f.progress < 1) {
+      f.geo.dispose();
+      f.geo = new THREE.TubeGeometry(
+        new THREE.LineCurve3(f.from, curEnd), 12, 0.22, 6, false
+      );
+      f.mesh.geometry = f.geo;
+    }
+
+    // Fade out quickly at the end (last 20% of travel)
+    f.mat.opacity = f.progress > 0.8
+      ? 0.85 * (1 - (f.progress - 0.8) / 0.2)
+      : 0.85;
+
+    // Remove once fully faded
+    if (f.progress >= 1) {
+      scene.remove(f.mesh);
+      f.geo.dispose();
+      f.mat.dispose();
+      activeMRFlows.splice(i, 1);
+    }
+  }
+
+  // ── Check active commit jobs for arrival ───────────────────────
+  activeJobs = activeJobs.filter(job => {
+    if (job.arrived) return false;   // already handled, remove
+    const wp  = WAYPOINTS[job.struct.waypointIdx];
+    const dist = job.dev.group.position.distanceTo(wp);
+    if (dist < 1.2) {
+      // Developer has arrived — freeze them in a "working" pose
+      job.arrived = true;
+      job.dev.isWorking = true;
+      // Arms raised slightly (typing/working pose)
+      job.dev.aL.rotation.x = -0.6;
+      job.dev.aR.rotation.x = -0.6;
+      job.dev.lL.rotation.x =  0;
+      job.dev.lR.rotation.x =  0;
+
+      // ── Activate all commit visuals together ──────────────────
+      activateCommit(job.struct, job.toastMsg);
+
+      // After 7 s: release dev and deactivate all visuals together
+      job.workTimer = setTimeout(() => {
+        job.dev.isWorking = false;
+        job.dev.commitJob = null;
+        // Resume normal road walking
+        const neighbours = ROAD_GRAPH[job.dev.targetIdx];
+        job.dev.targetIdx = neighbours[Math.floor(Math.random() * neighbours.length)];
+
+        // ── Deactivate all commit visuals together ────────────────
+        deactivateCommit(job.struct);
+      }, 7000);
+    }
+    return !job.arrived;
+  });
+
+  // ── Check active MR jobs for arrival ──────────────────────────
+  activeMRJobs = activeMRJobs.filter(job => {
+    if (job.arrived) return false;
+    const wp   = WAYPOINTS[job.struct.waypointIdx];
+    const dist = job.dev.group.position.distanceTo(wp);
+    if (dist < 1.2) {
+      job.arrived = true;
+      job.dev.isWorking = true;
+      job.dev.aL.rotation.x = -0.6;
+      job.dev.aR.rotation.x = -0.6;
+      job.dev.lL.rotation.x =  0;
+      job.dev.lR.rotation.x =  0;
+
+      // ── Spawn the flow line immediately (dev → repo) ──────────
+      const rep = REPO_BY_TYPE[job.struct.type];
+      const repoPos = rep
+        ? { x: rep.pos[0], z: rep.pos[2] }
+        : { x: wp.x, z: wp.z };
+      spawnMRFlow(job.dev.group, repoPos);
+
+      // ── After 1.5 s (flow reaches building): show beam + icon ─
+      setTimeout(() => {
+        activateMR(job.struct, job.toastMsg);
+      }, 1500);
+
+      // After 1.5 s flow + 7 s active = 8.5 s total work period
+      job.workTimer = setTimeout(() => {
+        // Trigger merge success visuals (burst → success icon + green beam)
+        triggerMergeSuccess(job.struct, job.dev);
+
+        // After the success visuals (≈4 s), resume developer walking and clear job
+        setTimeout(() => {
+          job.dev.isWorking = false;
+          job.dev.mrJob = null;
+          const neighbours = ROAD_GRAPH[job.dev.targetIdx];
+          job.dev.targetIdx = neighbours[Math.floor(Math.random() * neighbours.length)];
+        }, 4000);
+      }, 8500);
+    }
+    return !job.arrived;
+  });
+
+  // Move each developer toward its current waypoint
+  devs.forEach((dev) => {
+    if (dev.isStationary) {
+      // Wira: seated idle — gentle arm sway only, body stays on bench
+      const sway = Math.sin(t * 1.5 + dev.phase) * 0.08;
+      dev.aL.rotation.x = 0.5 + sway;
+      dev.aR.rotation.x = 0.5 - sway;
+      return;
+    }
+    // Developer is at their desk working — only subtle hand-typing sway
+    if (dev.isWorking) {
+      const tap = Math.sin(t * 8 + dev.phase) * 0.12;
+      dev.aL.rotation.x = -0.6 + tap;
+      dev.aR.rotation.x = -0.6 - tap;
+      return;
+    }
+    const target = WAYPOINTS[dev.targetIdx];
+    const dir = target.clone().sub(dev.group.position);
+    if (dir.length() < 0.25) {
+      // pick next waypoint based on role
+      if (dev.role === 'caretaker') {
+        // caretakers alternate between plaza and EOC along the road
+        dev.targetIdx = CARETAKER_WPS[Math.floor(Math.random() * CARETAKER_WPS.length)];
+      } else {
+        // engineers follow road adjacency — only step to connected neighbours
+        const neighbours = ROAD_GRAPH[dev.targetIdx];
+        dev.targetIdx = neighbours[Math.floor(Math.random() * neighbours.length)];
+      }
+    } else {
+      dev.group.position.addScaledVector(dir.normalize(), dev.speed);
+      dev.group.rotation.y = Math.atan2(dir.x, dir.z);
+      // limb swing
+      const swing = Math.sin(t * 6 + dev.phase) * 0.4;
+      dev.lL.rotation.x =  swing;
+      dev.lR.rotation.x = -swing;
+      dev.aL.rotation.x = -swing * 0.75;
+      dev.aR.rotation.x =  swing * 0.75;
+    }
+  });
+
+  updateCamera();
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Open MR Panel ─────────────────────────────────────────────
+(function buildMRPanel() {
+  const list      = document.getElementById('mr-panel-list');
+  const totalEl   = document.getElementById('mr-panel-total-value');
+
+  // Sort: highest MR count first, then alphabetically
+  const sorted = [...STRUCTURES].sort((a, b) => b.openMRs - a.openMRs || a.repo.localeCompare(b.repo));
+
+  const total = sorted.reduce((s, r) => s + r.openMRs, 0);
+  totalEl.textContent = total;
+
+  sorted.forEach(s => {
+    const countLevel = s.openMRs >= 6 ? 'high' : s.openMRs >= 3 ? 'medium' : s.openMRs >= 1 ? 'low' : 'zero';
+
+    const a = document.createElement('a');
+    a.className  = 'mr-repo-row' + (s.openMRs === 0 ? ' zero' : '');
+    a.href       = s.gitlabUrl;
+    a.target     = '_blank';
+    a.rel        = 'noopener noreferrer';
+    a.innerHTML  = `
+      <span class="mr-repo-icon">${s.icon}</span>
+      <span class="mr-repo-name">${s.repo}</span>
+      <span class="mr-count-badge ${countLevel}">${s.openMRs}</span>
+      <span class="mr-gitlab-arrow">↗</span>
+    `;
+    list.appendChild(a);
+  });
+})();
+
+function toggleMRPanel() {
+  const overlay = document.getElementById('mr-panel-overlay');
+  overlay.classList.toggle('open');
+}
+function closeMRPanel(e) {
+  if (e.target === document.getElementById('mr-panel-overlay')) {
+    document.getElementById('mr-panel-overlay').classList.remove('open');
+  }
+}
+function closeMRPanelDirect() {
+  document.getElementById('mr-panel-overlay').classList.remove('open');
+}
+// Expose to global scope so onclick="" attributes work from module context
+window.toggleMRPanel      = toggleMRPanel;
+window.closeMRPanel       = closeMRPanel;
+window.closeMRPanelDirect = closeMRPanelDirect;
+</script>
+</body>
+</html>

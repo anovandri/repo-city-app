@@ -1,0 +1,63 @@
+-- ─────────────────────────────────────────────────────────────────
+--  Seed: 18 GitLab repositories
+-- ─────────────────────────────────────────────────────────────────
+INSERT INTO gitlab_repositories (slug, gitlab_url, icon, open_mrs) VALUES
+  ('ms-partner-administration',  'https://gitlab.com/kreasipositif/ms-partner-administration/-/merge_requests',  '🛡️',  3),
+  ('ms-atome',                   'https://gitlab.com/kreasipositif/ms-atome/-/merge_requests',                   '⚛️',  1),
+  ('ms-callback',                'https://gitlab.com/kreasipositif/ms-callback/-/merge_requests',                '🔄',  5),
+  ('ms-cbrl',                    'https://gitlab.com/kreasipositif/ms-cbrl/-/merge_requests',                    '🏦',  2),
+  ('ms-customer',                'https://gitlab.com/kreasipositif/ms-customer/-/merge_requests',                '👤',  4),
+  ('api-gateway',                'https://gitlab.com/kreasipositif/api-gateway/-/merge_requests',                '🚪',  0),
+  ('ms-integration',             'https://gitlab.com/kreasipositif/ms-integration/-/merge_requests',             '🔗',  7),
+  ('ms-registration',            'https://gitlab.com/kreasipositif/ms-registration/-/merge_requests',            '📋',  2),
+  ('ms-transaction',             'https://gitlab.com/kreasipositif/ms-transaction/-/merge_requests',             '💸',  6),
+  ('web-frontend',               'https://gitlab.com/kreasipositif/web-frontend/-/merge_requests',               '🌐',  1),
+  ('ms-catalog',                 'https://gitlab.com/kreasipositif/ms-catalog/-/merge_requests',                 '📦',  3),
+  ('ms-payment-gateway',         'https://gitlab.com/kreasipositif/ms-payment-gateway/-/merge_requests',         '💳',  0),
+  ('ms-resource',                'https://gitlab.com/kreasipositif/ms-resource/-/merge_requests',                '🗄️',  2),
+  ('ms-pipeline-transaction',    'https://gitlab.com/kreasipositif/ms-pipeline-transaction/-/merge_requests',    '🔀',  4),
+  ('ms-automation',              'https://gitlab.com/kreasipositif/ms-automation/-/merge_requests',              '🤖',  1),
+  ('ms-partner',                 'https://gitlab.com/kreasipositif/ms-partner/-/merge_requests',                 '🤝',  0),
+  ('ms-ginpay',                  'https://gitlab.com/kreasipositif/ms-ginpay/-/merge_requests',                  '💰',  0),
+  ('production-support',         'https://gitlab.com/kreasipositif/production-support/-/merge_requests',         '🛠️',  8);
+
+-- ─────────────────────────────────────────────────────────────────
+--  Seed: 36 GitLab users
+-- ─────────────────────────────────────────────────────────────────
+INSERT INTO gitlab_users (display_name, gitlab_username, gender, role) VALUES
+  ('Aditya Novandri',  NULL, 'MALE',   'ENGINEER'),
+  ('Agung Maulana',    NULL, 'MALE',   'ENGINEER'),
+  ('Agus Triantoro',   NULL, 'MALE',   'ENGINEER'),
+  ('Ali H',            NULL, 'MALE',   'ENGINEER'),
+  ('Andes',            NULL, 'MALE',   'ENGINEER'),
+  ('Ardi Rizmaldi',    NULL, 'MALE',   'ENGINEER'),
+  ('Ardy',             NULL, 'MALE',   'ENGINEER'),
+  ('Astrid',           NULL, 'FEMALE', 'ENGINEER'),
+  ('Dani',             NULL, 'MALE',   'ENGINEER'),
+  ('Djamal_a_m',       NULL, 'MALE',   'ENGINEER'),
+  ('Edityo',           NULL, 'MALE',   'ENGINEER'),
+  ('Evan.Rahanda',     NULL, 'MALE',   'ENGINEER'),
+  ('Fina',             NULL, 'FEMALE', 'ENGINEER'),
+  ('Hasan',            NULL, 'MALE',   'ENGINEER'),
+  ('Hedy Simamora',    NULL, 'MALE',   'ENGINEER'),
+  ('Hendry',           NULL, 'MALE',   'ENGINEER'),
+  ('Iman',             NULL, 'MALE',   'ENGINEER'),
+  ('Jamal SA',         NULL, 'MALE',   'ENGINEER'),
+  ('Kent K',           NULL, 'MALE',   'CARETAKER'),
+  ('Mahen',            NULL, 'MALE',   'ENGINEER'),
+  ('Meicen',           NULL, 'FEMALE', 'ENGINEER'),
+  ('Meita',            NULL, 'FEMALE', 'CARETAKER'),
+  ('Nabiila',          NULL, 'FEMALE', 'ENGINEER'),
+  ('Naura',            NULL, 'FEMALE', 'ENGINEER'),
+  ('Nita',             NULL, 'FEMALE', 'ENGINEER'),
+  ('Rangga',           NULL, 'MALE',   'ENGINEER'),
+  ('Reyhan',           NULL, 'MALE',   'ENGINEER'),
+  ('Rizki Ekaputri',   NULL, 'FEMALE', 'ENGINEER'),
+  ('Septebrina',       NULL, 'FEMALE', 'ENGINEER'),
+  ('Sisi Maukar',      NULL, 'FEMALE', 'ENGINEER'),
+  ('Taufik',           NULL, 'MALE',   'ENGINEER'),
+  ('Tedi Yuwono',      NULL, 'MALE',   'ENGINEER'),
+  ('Tommi Irawan',     NULL, 'MALE',   'ENGINEER'),
+  ('Wina',             NULL, 'FEMALE', 'ENGINEER'),
+  ('Wira',             NULL, 'MALE',   'LEADER'),
+  ('Yuni Marlina',     NULL, 'FEMALE', 'ENGINEER');

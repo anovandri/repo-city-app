@@ -1,0 +1,32 @@
+# ── Environment / secrets ─────────────────────────────────────
+.env
+*.env.local
+
+# ── Maven build output ────────────────────────────────────────
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# ── Java compiled classes ─────────────────────────────────────
+*.class
+*.jar
+*.war
+
+# ── IDE files ─────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/settings.json
+.eclipse/
+*.classpath
+*.project
+*.factorypath
+
+# ── Node / npm ────────────────────────────────────────────────
+node_modules/
+
+# ── OS artefacts ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/

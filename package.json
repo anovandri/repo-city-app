@@ -1,0 +1,16 @@
+{
+  "name": "repo-city",
+  "version": "1.0.0",
+  "description": "Repo City — monorepo root. Maven commands proxied via npm scripts.",
+  "private": true,
+  "scripts": {
+    "poller:build":   "mvn -f apps/rest-poller/pom.xml clean package -DskipTests",
+    "poller:compile": "mvn -f apps/rest-poller/pom.xml compile",
+    "poller:test":    "mvn -f apps/rest-poller/pom.xml test",
+    "poller:run":     "mvn -f apps/rest-poller/pom.xml spring-boot:run",
+    "poller:clean":   "mvn -f apps/rest-poller/pom.xml clean",
+    "build":          "npm run poller:build",
+    "test":           "npm run poller:test",
+    "clean":          "npm run poller:clean"
+  }
+}
