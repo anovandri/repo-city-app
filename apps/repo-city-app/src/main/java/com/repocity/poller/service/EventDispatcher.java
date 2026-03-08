@@ -12,6 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Parses raw GitLab JSON arrays and persists {@link PollEvent} records.
+ *
+ * <p>MR and pipeline events are <em>deduplicated</em> by {@code gitlab_iid} so the same
+ * item is never re-inserted across poll cycles.  COMMIT events (identified by SHA, not
+ * by a stable numeric id) are always inserted as-is.
  */
 @Service
 public class EventDispatcher {
@@ -29,35 +33,60 @@ public class EventDispatcher {
 
     @Transactional
     public void dispatchCommits(String repoSlug, String json) {
-        dispatch(repoSlug, json, EventType.COMMIT, "author_name");
+        // Commits have no stable numeric id we can dedup on — always insert.
+        dispatch(repoSlug, json, EventType.COMMIT, "author_name", "id", false);
     }
 
     @Transactional
     public void dispatchMergeRequests(String repoSlug, String json, EventType type) {
-        dispatch(repoSlug, json, type, "author");
+        // MRs carry a project-scoped iid — deduplicate so re-polls are safe.
+        dispatch(repoSlug, json, type, "author", "iid", true);
     }
 
     @Transactional
     public void dispatchPipelines(String repoSlug, String json) {
-        dispatch(repoSlug, json, EventType.PIPELINE, "user");
+        // Pipelines carry a numeric id — deduplicate.
+        dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true);
     }
 
     // ── Private ────────────────────────────────────────────────────
 
-    private void dispatch(String repoSlug, String json, EventType type, String authorField) {
+    private void dispatch(String repoSlug, String json, EventType type,
+                          String authorField, String iidField, boolean dedup) {
         try {
             JsonNode array = mapper.readTree(json);
             if (!array.isArray()) return;
 
+            int saved = 0;
+            int skipped = 0;
+
             for (JsonNode node : array) {
-                String author = extractAuthor(node, authorField);
+                Long   iid    = extractLong(node, iidField);
+                String webUrl = extractText(node, "web_url");
+
+                // Skip if we've already persisted this exact event item.
+                if (dedup && iid != null
+                        && eventRepo.existsByEventTypeAndRepoSlugAndGitlabIid(type, repoSlug, iid)) {
+                    skipped++;
+                    continue;
+                }
+
+                String author  = extractAuthor(node, authorField);
                 String payload = truncate(node.toString());
+
                 PollEvent event = new PollEvent(type, repoSlug, author, payload);
+                event.setGitlabIid(iid);
+                event.setWebUrl(webUrl);
                 eventRepo.save(event);
+                saved++;
             }
 
-            if (array.size() > 0) {
-                log.debug("Dispatched {} {} event(s) for {}", array.size(), type, repoSlug);
+            if (saved > 0) {
+                log.info("Dispatched {} new {} event(s) for {} ({} duplicate(s) skipped)",
+                         saved, type, repoSlug, skipped);
+            } else if (skipped > 0) {
+                log.debug("All {} {} event(s) for {} already stored — skipped",
+                          skipped, type, repoSlug);
             }
         } catch (Exception e) {
             log.error("Failed to dispatch {} events for {}: {}", type, repoSlug, e.getMessage());
@@ -72,6 +101,18 @@ public class EventDispatcher {
         // MRs / pipelines: nested object with "username"
         JsonNode username = f.get("username");
         return username != null ? username.asText() : null;
+    }
+
+    private Long extractLong(JsonNode node, String field) {
+        JsonNode f = node.get(field);
+        if (f == null || !f.isNumber()) return null;
+        return f.asLong();
+    }
+
+    private String extractText(JsonNode node, String field) {
+        JsonNode f = node.get(field);
+        if (f == null || !f.isTextual()) return null;
+        return f.asText();
     }
 
     private String truncate(String s) {

@@ -14,13 +14,17 @@ public class GitLabRepository {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Short repository slug (e.g. "ms-partner-administration") */
+    /** Short repository slug (e.g. "partner-administration") */
     @Column(nullable = false, unique = true, length = 120)
     private String slug;
 
-    /** Full GitLab URL to the project's merge-request list */
-    @Column(name = "gitlab_url", nullable = false, length = 512)
-    private String gitlabUrl;
+    /**
+     * GitLab numeric project ID (e.g. 37347452).
+     * More stable than group/slug paths — survives repo renames.
+     * Used by {@link com.repocity.poller.client.GitLabClient} to build API URLs.
+     */
+    @Column(name = "gitlab_project_id", nullable = false, unique = true)
+    private Long gitlabProjectId;
 
     /** Emoji icon displayed in the city UI */
     @Column(length = 8)
@@ -30,10 +34,10 @@ public class GitLabRepository {
     @Column(name = "open_mrs")
     private int openMrs;
 
-    public GitLabRepository(String slug, String gitlabUrl, String icon, int openMrs) {
-        this.slug = slug;
-        this.gitlabUrl = gitlabUrl;
-        this.icon = icon;
-        this.openMrs = openMrs;
+    public GitLabRepository(String slug, Long gitlabProjectId, String icon, int openMrs) {
+        this.slug             = slug;
+        this.gitlabProjectId  = gitlabProjectId;
+        this.icon             = icon;
+        this.openMrs          = openMrs;
     }
 }

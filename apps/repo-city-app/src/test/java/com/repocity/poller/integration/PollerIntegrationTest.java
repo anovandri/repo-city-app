@@ -96,14 +96,14 @@ class PollerIntegrationTest {
     @Test
     void singlePollCycle_persistsEventsForAllSeededRepos() {
         int repoCount = (int) repoRepository.count();
-        assertThat(repoCount).isEqualTo(18); // all 18 repos seeded
+        assertThat(repoCount).isEqualTo(16); // all 16 repos seeded
 
         pollerService.pollAll();
 
         List<PollEvent> allEvents = pollEventRepository.findAll();
 
-        // Expect at least 2 events per repo (1 COMMIT + 1 MR_OPENED) × 18 repos
-        // plus 1 PIPELINE per repo = 54 events minimum
+        // Expect at least 2 events per repo (1 COMMIT + 1 MR_OPENED) × 16 repos
+        // plus 1 PIPELINE per repo = 48 events minimum
         assertThat(allEvents.size()).isGreaterThanOrEqualTo(repoCount * 2);
     }
 

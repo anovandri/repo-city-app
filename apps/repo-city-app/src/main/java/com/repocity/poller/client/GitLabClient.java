@@ -26,16 +26,13 @@ public class GitLabClient {
     private final HttpClient http;
     private final String baseUrl;
     private final String token;
-    private final String group;
 
     public GitLabClient(
             @Value("${gitlab.base-url}") String baseUrl,
-            @Value("${gitlab.token}")    String token,
-            @Value("${gitlab.group}")    String group) {
+            @Value("${gitlab.token}")    String token) {
 
         this.baseUrl = baseUrl;
         this.token   = token;
-        this.group   = group;
         this.http    = HttpClient.newBuilder()
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .connectTimeout(Duration.ofSeconds(10))
@@ -47,41 +44,41 @@ public class GitLabClient {
     /**
      * Fetch commits for a repository since a given instant.
      *
-     * @param repoSlug repository slug within the configured group
-     * @param since    only return commits after this instant (nullable → all)
+     * @param projectId GitLab numeric project ID
+     * @param since     only return commits after this instant (nullable → all)
      * @return raw JSON string from GitLab
      */
-    public String fetchCommits(String repoSlug, Instant since) {
+    public String fetchCommits(long projectId, Instant since) {
         String sinceParam = since != null ? "&since=" + since.toString() : "";
-        String path = "/api/v4/projects/%s%%2F%s/repository/commits?per_page=20%s"
-                .formatted(group, repoSlug, sinceParam);
+        String path = "/api/v4/projects/%d/repository/commits?per_page=20%s"
+                .formatted(projectId, sinceParam);
         return get(path);
     }
 
     /**
      * Fetch merge requests for a repository.
      *
-     * @param repoSlug repository slug
-     * @param state    "opened", "merged", "closed", or "all"
+     * @param projectId GitLab numeric project ID
+     * @param state     "opened", "merged", "closed", or "all"
      * @return raw JSON string from GitLab
      */
-    public String fetchMergeRequests(String repoSlug, String state) {
-        String path = "/api/v4/projects/%s%%2F%s/merge_requests?state=%s&per_page=20"
-                .formatted(group, repoSlug, state);
+    public String fetchMergeRequests(long projectId, String state) {
+        String path = "/api/v4/projects/%d/merge_requests?state=%s&per_page=20"
+                .formatted(projectId, state);
         return get(path);
     }
 
     /**
      * Fetch recent pipelines for a repository.
      *
-     * @param repoSlug repository slug
-     * @param since    only return pipelines updated after this instant (nullable → all)
+     * @param projectId GitLab numeric project ID
+     * @param since     only return pipelines updated after this instant (nullable → all)
      * @return raw JSON string from GitLab
      */
-    public String fetchPipelines(String repoSlug, Instant since) {
+    public String fetchPipelines(long projectId, Instant since) {
         String sinceParam = since != null ? "&updated_after=" + since.toString() : "";
-        String path = "/api/v4/projects/%s%%2F%s/pipelines?per_page=20%s"
-                .formatted(group, repoSlug, sinceParam);
+        String path = "/api/v4/projects/%d/pipelines?per_page=20%s"
+                .formatted(projectId, sinceParam);
         return get(path);
     }
 

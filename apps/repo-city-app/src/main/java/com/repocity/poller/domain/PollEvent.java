@@ -9,8 +9,15 @@ import java.time.Instant;
 @Entity
 @Table(name = "poll_events",
        indexes = {
-           @Index(name = "idx_poll_events_repo", columnList = "repo_slug"),
-           @Index(name = "idx_poll_events_created", columnList = "created_at")
+           @Index(name = "idx_poll_events_repo",     columnList = "repo_slug"),
+           @Index(name = "idx_poll_events_created",  columnList = "created_at"),
+           @Index(name = "idx_poll_events_iid",      columnList = "event_type,repo_slug,gitlab_iid")
+       },
+       uniqueConstraints = {
+           // Prevents the same MR / pipeline from being re-inserted on every poll cycle.
+           // gitlab_iid is NULL for COMMITs so the constraint only fires when iid is present.
+           @UniqueConstraint(name = "uq_poll_events_iid",
+                             columnNames = {"event_type", "repo_slug", "gitlab_iid"})
        })
 @Data
 @NoArgsConstructor
@@ -31,6 +38,21 @@ public class PollEvent {
     /** Repository slug this event belongs to */
     @Column(name = "repo_slug", nullable = false, length = 120)
     private String repoSlug;
+
+    /**
+     * GitLab internal numeric ID for the event item (MR iid, pipeline id).
+     * NULL for COMMIT events (they are identified by SHA, not re-polled individually).
+     * The unique constraint on (event_type, repo_slug, gitlab_iid) prevents duplicates.
+     */
+    @Column(name = "gitlab_iid")
+    private Long gitlabIid;
+
+    /**
+     * Direct GitLab URL for this event item (e.g. the MR page URL).
+     * Populated for MR_OPENED and MR_MERGED events; null for others.
+     */
+    @Column(name = "web_url", length = 512)
+    private String webUrl;
 
     /** GitLab username of the event author (may be null for pipeline events) */
     @Column(name = "author_username", length = 120)

@@ -4,6 +4,7 @@ import com.repocity.poller.client.GitLabClient;
 import com.repocity.identity.domain.GitLabRepository;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.identity.repository.RepoRepository;
+import com.repocity.poller.repository.PollEventRepository;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ public class PollerService {
     private final RepoRepository    repoRepo;
     private final GitLabClient      gitLabClient;
     private final EventDispatcher   dispatcher;
+    private final PollEventRepository pollEventRepo;
     private final long              pollIntervalSeconds;
 
     /** Virtual-thread-per-task executor used for the per-repo HTTP calls. */
@@ -43,14 +45,16 @@ public class PollerService {
     private volatile Instant lastPoll = null;
 
     public PollerService(
-            RepoRepository  repoRepo,
-            GitLabClient    gitLabClient,
-            EventDispatcher dispatcher,
+            RepoRepository    repoRepo,
+            GitLabClient      gitLabClient,
+            EventDispatcher   dispatcher,
+            PollEventRepository pollEventRepo,
             @Value("${gitlab.poll-interval-seconds:60}") long pollIntervalSeconds) {
 
         this.repoRepo            = repoRepo;
         this.gitLabClient        = gitLabClient;
         this.dispatcher          = dispatcher;
+        this.pollEventRepo       = pollEventRepo;
         this.pollIntervalSeconds = pollIntervalSeconds;
     }
 
@@ -106,22 +110,31 @@ public class PollerService {
     }
 
     private void pollRepo(GitLabRepository repo, Instant since) {
-        String slug = repo.getSlug();
+        String slug      = repo.getSlug();
+        long   projectId = repo.getGitlabProjectId();
         try {
             // Commits
-            String commits = gitLabClient.fetchCommits(slug, since);
+            String commits = gitLabClient.fetchCommits(projectId, since);
             dispatcher.dispatchCommits(slug, commits);
 
             // Open MRs
-            String openMrs = gitLabClient.fetchMergeRequests(slug, "opened");
+            String openMrs = gitLabClient.fetchMergeRequests(projectId, "opened");
             dispatcher.dispatchMergeRequests(slug, openMrs, EventType.MR_OPENED);
 
             // Merged MRs (only recent ones via since filter)
-            String mergedMrs = gitLabClient.fetchMergeRequests(slug, "merged");
+            String mergedMrs = gitLabClient.fetchMergeRequests(projectId, "merged");
             dispatcher.dispatchMergeRequests(slug, mergedMrs, EventType.MR_MERGED);
 
+            // Refresh the open MR count: opened iids that have NOT been merged yet.
+            int freshOpenMrs = (int) pollEventRepo.countOpenMrs(slug);
+            if (repo.getOpenMrs() != freshOpenMrs) {
+                repo.setOpenMrs(freshOpenMrs);
+                repoRepo.save(repo);
+                log.debug("Updated open_mrs for {} → {}", slug, freshOpenMrs);
+            }
+
             // Pipelines
-            String pipelines = gitLabClient.fetchPipelines(slug, since);
+            String pipelines = gitLabClient.fetchPipelines(projectId, since);
             dispatcher.dispatchPipelines(slug, pipelines);
 
         } catch (Exception e) {

@@ -1,0 +1,52 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Repo City App ────────────────────────────────────────────
+  repo-city-app:
+    build:
+      context: ./apps/repo-city-app
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT:            ${SERVER_PORT:-8080}
+      GITLAB_BASE_URL:        ${GITLAB_BASE_URL:-https://gitlab.com}
+      GITLAB_TOKEN:           ${GITLAB_TOKEN}
+      POLL_INTERVAL_SECONDS:  ${POLL_INTERVAL_SECONDS:-60}
+      # Prod profile → uses PostgreSQL instead of H2
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL:                 ${DB_URL}
+      DB_USERNAME:            ${DB_USERNAME}
+      DB_PASSWORD:            ${DB_PASSWORD}
+      # Always run seed on startup — data-postgresql.sql uses ON CONFLICT DO NOTHING
+      SPRING_SQL_INIT_MODE:   always
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:

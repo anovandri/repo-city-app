@@ -20,9 +20,8 @@ class GitLabClientTest {
     private static WireMockServer wireMock;
     private GitLabClient client;
 
-    private static final String GROUP = "mygroup";
-    private static final String SLUG  = "ms-test";
-    private static final String TOKEN = "test-token";
+    private static final long   PROJECT_ID = 37347452L;
+    private static final String TOKEN      = "test-token";
 
     @BeforeAll
     static void startWireMock() {
@@ -40,8 +39,7 @@ class GitLabClientTest {
         wireMock.resetAll();
         client = new GitLabClient(
                 "http://localhost:" + wireMock.port(),
-                TOKEN,
-                GROUP);
+                TOKEN);
     }
 
     // ── fetchCommits ──────────────────────────────────────────────
@@ -54,7 +52,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*commits.*"))
                 .willReturn(okJson(responseBody)));
 
-        String result = client.fetchCommits(SLUG, null);
+        String result = client.fetchCommits(PROJECT_ID, null);
 
         assertThat(result).contains("author_name");
         assertThat(result).contains("Aditya");
@@ -67,7 +65,7 @@ class GitLabClientTest {
                 .withQueryParam("since", equalTo(since.toString()))
                 .willReturn(okJson("[]")));
 
-        String result = client.fetchCommits(SLUG, since);
+        String result = client.fetchCommits(PROJECT_ID, since);
 
         assertThat(result).isEqualTo("[]");
         wireMock.verify(getRequestedFor(urlPathMatching(".*commits.*"))
@@ -79,7 +77,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*commits.*"))
                 .willReturn(okJson("[]")));
 
-        client.fetchCommits(SLUG, null);
+        client.fetchCommits(PROJECT_ID, null);
 
         wireMock.verify(getRequestedFor(urlPathMatching(".*commits.*"))
                 .withHeader("PRIVATE-TOKEN", equalTo(TOKEN)));
@@ -90,7 +88,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*commits.*"))
                 .willReturn(aResponse().withStatus(404).withBody("Not Found")));
 
-        String result = client.fetchCommits(SLUG, null);
+        String result = client.fetchCommits(PROJECT_ID, null);
 
         assertThat(result).isEqualTo("[]");
     }
@@ -100,7 +98,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*commits.*"))
                 .willReturn(aResponse().withStatus(401).withBody("Unauthorized")));
 
-        String result = client.fetchCommits(SLUG, null);
+        String result = client.fetchCommits(PROJECT_ID, null);
 
         assertThat(result).isEqualTo("[]");
     }
@@ -112,7 +110,7 @@ class GitLabClientTest {
                 .willReturn(aResponse().withFault(
                         com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER)));
 
-        String result = client.fetchCommits(SLUG, null);
+        String result = client.fetchCommits(PROJECT_ID, null);
 
         assertThat(result).isEqualTo("[]");
     }
@@ -127,7 +125,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*merge_requests.*"))
                 .willReturn(okJson(body)));
 
-        String result = client.fetchMergeRequests(SLUG, "opened");
+        String result = client.fetchMergeRequests(PROJECT_ID, "opened");
 
         assertThat(result).contains("wira");
     }
@@ -138,7 +136,7 @@ class GitLabClientTest {
                 .withQueryParam("state", equalTo("merged"))
                 .willReturn(okJson("[]")));
 
-        client.fetchMergeRequests(SLUG, "merged");
+        client.fetchMergeRequests(PROJECT_ID, "merged");
 
         wireMock.verify(getRequestedFor(urlPathMatching(".*merge_requests.*"))
                 .withQueryParam("state", equalTo("merged")));
@@ -149,7 +147,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*merge_requests.*"))
                 .willReturn(aResponse().withStatus(500)));
 
-        String result = client.fetchMergeRequests(SLUG, "opened");
+        String result = client.fetchMergeRequests(PROJECT_ID, "opened");
 
         assertThat(result).isEqualTo("[]");
     }
@@ -164,7 +162,7 @@ class GitLabClientTest {
         wireMock.stubFor(get(urlPathMatching("/api/v4/projects/.*pipelines.*"))
                 .willReturn(okJson(body)));
 
-        String result = client.fetchPipelines(SLUG, null);
+        String result = client.fetchPipelines(PROJECT_ID, null);
 
         assertThat(result).contains("andes");
     }
@@ -176,7 +174,7 @@ class GitLabClientTest {
                 .withQueryParam("updated_after", equalTo(since.toString()))
                 .willReturn(okJson("[]")));
 
-        client.fetchPipelines(SLUG, since);
+        client.fetchPipelines(PROJECT_ID, since);
 
         wireMock.verify(getRequestedFor(urlPathMatching(".*pipelines.*"))
                 .withQueryParam("updated_after", equalTo(since.toString())));
@@ -188,7 +186,7 @@ class GitLabClientTest {
                 .willReturn(aResponse().withFault(
                         com.github.tomakehurst.wiremock.http.Fault.EMPTY_RESPONSE)));
 
-        String result = client.fetchPipelines(SLUG, null);
+        String result = client.fetchPipelines(PROJECT_ID, null);
 
         assertThat(result).isEqualTo("[]");
     }

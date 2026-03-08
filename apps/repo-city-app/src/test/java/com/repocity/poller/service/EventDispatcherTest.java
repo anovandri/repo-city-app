@@ -96,10 +96,11 @@ class EventDispatcherTest {
     void dispatchMergeRequests_savesEventWithNestedAuthor() {
         String json = """
                 [
-                  {"iid":1,"state":"opened","author":{"id":10,"username":"wira"}},
-                  {"iid":2,"state":"opened","author":{"id":11,"username":"andes"}}
+                  {"iid":1,"state":"opened","web_url":"https://gitlab.com/group/repo/-/merge_requests/1","author":{"id":10,"username":"wira"}},
+                  {"iid":2,"state":"opened","web_url":"https://gitlab.com/group/repo/-/merge_requests/2","author":{"id":11,"username":"andes"}}
                 ]
                 """;
+        when(eventRepo.existsByEventTypeAndRepoSlugAndGitlabIid(any(), any(), anyLong())).thenReturn(false);
 
         dispatcher.dispatchMergeRequests("ms-customer", json, EventType.MR_OPENED);
 
@@ -109,12 +110,15 @@ class EventDispatcherTest {
         assertThat(saved).allMatch(e -> e.getEventType() == EventType.MR_OPENED);
         assertThat(saved).allMatch(e -> "ms-customer".equals(e.getRepoSlug()));
         assertThat(saved.get(0).getAuthorUsername()).isEqualTo("wira");
+        assertThat(saved.get(0).getGitlabIid()).isEqualTo(1L);
         assertThat(saved.get(1).getAuthorUsername()).isEqualTo("andes");
+        assertThat(saved.get(1).getGitlabIid()).isEqualTo(2L);
     }
 
     @Test
     void dispatchMergeRequests_mrMergedType_isPreserved() {
-        String json = "[{\"iid\":5,\"state\":\"merged\",\"author\":{\"username\":\"edityo\"}}]";
+        String json = "[{\"iid\":5,\"state\":\"merged\",\"web_url\":\"https://gitlab.com/group/repo/-/merge_requests/5\",\"author\":{\"username\":\"edityo\"}}]";
+        when(eventRepo.existsByEventTypeAndRepoSlugAndGitlabIid(any(), any(), anyLong())).thenReturn(false);
 
         dispatcher.dispatchMergeRequests("ms-integration", json, EventType.MR_MERGED);
 
@@ -125,6 +129,7 @@ class EventDispatcherTest {
     @Test
     void dispatchMergeRequests_missingAuthorField_savesNullUsername() {
         String json = "[{\"iid\":3,\"state\":\"opened\"}]";
+        when(eventRepo.existsByEventTypeAndRepoSlugAndGitlabIid(any(), any(), anyLong())).thenReturn(false);
 
         dispatcher.dispatchMergeRequests("ms-catalog", json, EventType.MR_OPENED);
 
@@ -137,8 +142,9 @@ class EventDispatcherTest {
     @Test
     void dispatchPipelines_savesEventWithNestedUser() {
         String json = """
-                [{"id":99,"status":"success","user":{"username":"rangga"}}]
+                [{"id":99,"status":"success","web_url":"https://gitlab.com/group/repo/-/pipelines/99","user":{"username":"rangga"}}]
                 """;
+        when(eventRepo.existsByEventTypeAndRepoSlugAndGitlabIid(any(), any(), anyLong())).thenReturn(false);
 
         dispatcher.dispatchPipelines("api-gateway", json);
 

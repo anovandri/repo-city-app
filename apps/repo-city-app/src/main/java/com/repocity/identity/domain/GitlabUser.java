@@ -22,7 +22,7 @@ public class GitlabUser {
      * GitLab username used to match events from the API.
      * May be null until resolved from a real API response.
      */
-    @Column(name = "gitlab_username", length = 120)
+    @Column(name = "gitlab_username", unique = true, length = 120)
     private String gitlabUsername;
 
     @Enumerated(EnumType.STRING)

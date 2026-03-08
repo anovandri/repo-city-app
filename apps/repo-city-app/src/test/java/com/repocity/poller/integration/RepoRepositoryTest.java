@@ -37,7 +37,7 @@ class RepoRepositoryTest {
 
     @Test
     void seedData_loads_all18Repos() {
-        assertThat(repoRepo.count()).isEqualTo(18);
+        assertThat(repoRepo.count()).isEqualTo(16);
     }
 
     @Test
@@ -49,12 +49,12 @@ class RepoRepositoryTest {
 
     @Test
     void findBySlug_returnsCorrectRepo() {
-        Optional<GitLabRepository> repo = repoRepo.findBySlug("ms-customer");
+        Optional<GitLabRepository> repo = repoRepo.findBySlug("partner-customer");
 
         assertThat(repo).isPresent();
         assertThat(repo.get().getIcon()).isEqualTo("👤");
         assertThat(repo.get().getOpenMrs()).isEqualTo(4);
-        assertThat(repo.get().getGitlabUrl()).contains("ms-customer");
+        assertThat(repo.get().getGitlabProjectId()).isEqualTo(35828382L);
     }
 
     @Test
@@ -63,9 +63,9 @@ class RepoRepositoryTest {
     }
 
     @Test
-    void allRepos_haveNonBlankGitlabUrl() {
+    void allRepos_havePositiveGitlabProjectId() {
         List<GitLabRepository> all = repoRepo.findAll();
-        assertThat(all).allMatch(r -> r.getGitlabUrl() != null && !r.getGitlabUrl().isBlank());
+        assertThat(all).allMatch(r -> r.getGitlabProjectId() != null && r.getGitlabProjectId() > 0);
     }
 
     @Test
@@ -75,17 +75,17 @@ class RepoRepositoryTest {
     }
 
     @Test
-    void productionSupport_hasHighestOpenMrs() {
-        Optional<GitLabRepository> ps = repoRepo.findBySlug("production-support");
-        assertThat(ps).isPresent();
-        assertThat(ps.get().getOpenMrs()).isEqualTo(8);
+    void partnerTransaction_hasHighestOpenMrs() {
+        Optional<GitLabRepository> repo = repoRepo.findBySlug("partner-transaction");
+        assertThat(repo).isPresent();
+        assertThat(repo.get().getOpenMrs()).isEqualTo(6);
     }
 
     @Test
     void saveAndRetrieve_newRepo() {
         GitLabRepository newRepo = new GitLabRepository(
                 "ms-new-service",
-                "https://gitlab.com/kreasipositif/ms-new-service/-/merge_requests",
+                99999999L,
                 "🆕",
                 0);
         repoRepo.save(newRepo);
