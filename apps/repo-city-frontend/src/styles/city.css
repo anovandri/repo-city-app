@@ -1,0 +1,414 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Repo City — Design Tokens & Global Styles
+   Faithful port of docs/prototype/index.html stylesheet
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --sky:          #87ceeb;
+  --hud-bg:       rgba(10, 20, 35, 0.72);
+  --hud-border:   rgba(80, 160, 255, 0.25);
+  --hud-blur:     blur(6px);
+
+  --commit-color: #ffdd66;
+  --mr-color:     #cc88ff;
+  --merge-color:  #66ff99;
+  --pipeline-color:#66ddff;
+
+  --clan-gold:    #ffe566;
+
+  --text-primary:   #e8f4ff;
+  --text-muted:     #8aadcc;
+  --text-dim:       rgba(200, 220, 255, 0.45);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sky);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--text-primary);
+}
+
+/* ── HUD Panel (top-left) ─────────────────────────────────────────── */
+.hud-panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  backdrop-filter: var(--hud-blur);
+  border-radius: 10px;
+  padding: 14px 18px;
+  min-width: 200px;
+  user-select: none;
+}
+
+.hud-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--clan-gold);
+  margin-bottom: 10px;
+}
+
+.hud-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.hud-stat-value {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-left: 10px;
+}
+
+.hud-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hud-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--hud-border);
+  border-radius: 6px;
+  background: rgba(80, 140, 220, 0.18);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.hud-btn:hover {
+  background: rgba(80, 140, 220, 0.35);
+}
+
+/* ── Overlay panels ───────────────────────────────────────────────── */
+.panel-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  background: var(--hud-bg);
+  border-radius: 12px;
+  backdrop-filter: var(--hud-blur);
+  width: 340px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mr-panel   { border: 1px solid rgba(160, 80, 255, 0.35); }
+.dev-panel  { border: 1px solid rgba(60, 200, 180, 0.35); }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.panel-total {
+  flex: 1;
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.panel-close:hover { color: #fff; }
+
+.panel-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 0;
+}
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ── MR Panel rows ────────────────────────────────────────────────── */
+.mr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  text-decoration: none;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  transition: background 0.12s;
+}
+.mr-row:hover { background: rgba(255,255,255,0.06); }
+
+.mr-icon  { font-size: 1rem; flex-shrink: 0; }
+.mr-name  { flex: 1; color: var(--text-muted); }
+
+.mr-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 24px;
+  text-align: center;
+}
+.mr-badge.high    { background: #ff3344; color: #fff; }
+.mr-badge.medium  { background: #ffaa22; color: #111; }
+.mr-badge.low     { background: #4488ff; color: #fff; }
+.mr-badge.zero    { background: rgba(255,255,255,0.08); color: var(--text-dim); }
+
+/* ── Dev Panel ────────────────────────────────────────────────────── */
+.dev-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 10px;
+}
+.dev-panel-body::-webkit-scrollbar { width: 4px; }
+.dev-panel-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+.dev-search {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hud-border);
+  background: rgba(255,255,255,0.07);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  outline: none;
+  flex-shrink: 0;
+}
+.dev-search::placeholder { color: var(--text-dim); }
+
+.dev-list { display: flex; flex-direction: column; gap: 2px; }
+
+.dev-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.dev-list-row:hover { background: rgba(255,255,255,0.08); }
+
+.dev-avatar    { font-size: 1.2rem; flex-shrink: 0; }
+.dev-list-name { flex: 1; }
+.dev-list-role { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Dev profile card */
+.dev-back {
+  background: none;
+  border: none;
+  color: var(--pipeline-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 0 8px 0;
+  text-align: left;
+}
+
+.dev-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+.dev-card-avatar { font-size: 2.2rem; }
+.dev-card-info   { display: flex; flex-direction: column; gap: 3px; }
+.dev-card-name   { font-weight: 700; font-size: 0.95rem; }
+.dev-card-gitlab { font-size: 0.8rem; color: var(--text-muted); }
+.dev-card-role   { font-size: 0.75rem; padding: 2px 8px; border-radius: 8px; display: inline-block; }
+
+.dev-card-role.role-leader    { background: rgba(255,220,60,0.2);  color: var(--clan-gold);     }
+.dev-card-role.role-caretaker { background: rgba(60,200,100,0.2);  color: #66ff99;              }
+.dev-card-role.role-engineer  { background: rgba(80,140,255,0.2);  color: #88aaff;              }
+
+/* Stat boxes */
+.dev-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.dev-stat-box {
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.dev-stat-box.commit   { background: rgba(255,220,60,0.12);  }
+.dev-stat-box.mr-opened{ background: rgba(180,60,255,0.12);  }
+.dev-stat-box.merged   { background: rgba(60,255,100,0.12);  }
+.dev-stat-box.pipeline { background: rgba(60,200,255,0.12);  }
+
+.dev-stat-val { font-size: 1.5rem; font-weight: 800; }
+.dev-stat-lbl { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.dev-stat-box.commit   .dev-stat-val { color: var(--commit-color);   }
+.dev-stat-box.mr-opened.dev-stat-val { color: var(--mr-color);       }
+.dev-stat-box.merged   .dev-stat-val { color: var(--merge-color);    }
+.dev-stat-box.pipeline .dev-stat-val { color: var(--pipeline-color); }
+
+/* Per-repo table */
+.dev-repo-table { font-size: 0.76rem; }
+.dev-repo-header,
+.dev-repo-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.2fr 1fr;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  align-items: center;
+}
+.dev-repo-header {
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 3px;
+}
+.dev-repo-row:hover { background: rgba(255,255,255,0.05); }
+
+/* ── Toast notifications ─────────────────────────────────────────── */
+.toast-container {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--hud-bg);
+  backdrop-filter: var(--hud-blur);
+  border-radius: 20px;
+  padding: 7px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.1);
+  animation: toastIn 0.25s ease;
+  white-space: nowrap;
+}
+
+.toast-commit_beam  { border-color: rgba(68,221,255,0.4);  color: var(--pipeline-color); }
+.toast-mr_beam      { border-color: rgba(200,80,255,0.4);  color: var(--mr-color);       }
+.toast-merge_success{ border-color: rgba(80,255,130,0.4);  color: var(--merge-color);    }
+.toast-pipeline_beam{ border-color: rgba(60,200,255,0.4);  color: var(--pipeline-color); }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── CSS2D Labels (injected into DOM by Three.js) ─────────────────── */
+
+/* Repo name labels (on buildings) */
+.repo-label {
+  background: rgba(10, 20, 40, 0.78);
+  border: 1px solid rgba(80,160,255,0.35);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ddeeff;
+  white-space: nowrap;
+  pointer-events: none;
+  text-transform: lowercase;
+}
+.repo-icon   { margin-right: 4px; }
+.label-sunset  { border-color: rgba(255,160,30,0.5); color: #ffcc88; }
+.label-support { border-color: rgba(255,80,80,0.5);  color: #ff9999; }
+
+/* Developer name chips */
+.dev-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  background: rgba(10,20,40,0.7);
+  border: 1px solid rgba(80,160,255,0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #bbddff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.dev-label.role-leader    { background: rgba(60,40,0,0.8);  border-color: rgba(255,220,60,0.5); color: var(--clan-gold); }
+.dev-label.role-caretaker { background: rgba(0,50,20,0.8);  border-color: rgba(60,255,120,0.4); color: #88ffaa; }
+.dev-label.gender-female  { border-color: rgba(255,120,180,0.35); color: #ffbbdd; }
+
+/* Clan title label */
+.clan-label {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--clan-gold);
+  text-shadow: 0 0 12px rgba(255,220,60,0.7);
+  pointer-events: none;
+  animation: clanPulse 3s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes clanPulse {
+  0%, 100% { text-shadow: 0 0 10px rgba(255,220,60,0.5); }
+  50%       { text-shadow: 0 0 22px rgba(255,220,60,0.9); }
+}
+
+/* District labels */
+.district-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(200,230,255,0.6);
+  pointer-events: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Event indicators (floating icons on buildings) */
+.event-indicator {
+  font-size: 1.4rem;
+  animation: indicatorBob 1s ease-in-out infinite;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+.event-commit   { filter: drop-shadow(0 0 8px #44ddff); }
+.event-mr       { filter: drop-shadow(0 0 8px #cc44ff); }
+.event-merge    { filter: drop-shadow(0 0 8px #66ff88); }
+.event-pipeline { filter: drop-shadow(0 0 8px #66ddff); }
+
+@keyframes indicatorBob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}

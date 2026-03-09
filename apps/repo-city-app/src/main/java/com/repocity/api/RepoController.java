@@ -1,7 +1,10 @@
 package com.repocity.api;
 
+import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.repository.PollEventRepository;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,12 +22,16 @@ public class RepoController {
     /** Matches the GitLab MR item path including the leading separator, e.g. "/-/merge_requests/899" */
     private static final Pattern MR_ITEM_SUFFIX = Pattern.compile("/-/merge_requests/\\d+$");
 
-    private final RepoRepository     repoRepository;
-    private final PollEventRepository pollEventRepository;
+    private final RepoRepository        repoRepository;
+    private final PollEventRepository   pollEventRepository;
+    private final GitlabUserRepository  gitlabUserRepository;
 
-    public RepoController(RepoRepository repoRepository, PollEventRepository pollEventRepository) {
-        this.repoRepository     = repoRepository;
-        this.pollEventRepository = pollEventRepository;
+    public RepoController(RepoRepository repoRepository,
+                          PollEventRepository pollEventRepository,
+                          GitlabUserRepository gitlabUserRepository) {
+        this.repoRepository       = repoRepository;
+        this.pollEventRepository  = pollEventRepository;
+        this.gitlabUserRepository = gitlabUserRepository;
     }
 
     /**
@@ -45,8 +52,8 @@ public class RepoController {
      * }</pre>
      */
     @GetMapping("/repos")
-    public List<RepoSummary> listRepos() {
-        return repoRepository.findAll().stream()
+    public ResponseEntity<List<RepoSummary>> listRepos() {
+        List<RepoSummary> body = repoRepository.findAll().stream()
                 .map(repo -> {
                     String mrListUrl = resolveMrListUrl(repo.getSlug());
                     return new RepoSummary(
@@ -60,6 +67,37 @@ public class RepoController {
                 })
                 .sorted((a, b) -> Integer.compare(b.openMrCount(), a.openMrCount()))
                 .toList();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(body);
+    }
+
+    /**
+     * Returns every registered developer (GitLab user) sorted by display name.
+     * Used by the city UI on startup to populate and render the developer avatars.
+     *
+     * <p>Example response item:
+     * <pre>{@code
+     * {
+     *   "displayName": "Aditya Novandri",
+     *   "role":        "ENGINEER",
+     *   "gender":      "MALE"
+     * }
+     * }</pre>
+     */
+    @GetMapping("/workers")
+    public ResponseEntity<List<WorkerSummary>> listWorkers() {
+        List<WorkerSummary> body = gitlabUserRepository.findAll().stream()
+                .map(u -> new WorkerSummary(
+                        u.getDisplayName(),
+                        u.getRole().name(),
+                        u.getGender().name()
+                ))
+                .sorted(java.util.Comparator.comparing(WorkerSummary::displayName))
+                .toList();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(body);
     }
 
     /**
