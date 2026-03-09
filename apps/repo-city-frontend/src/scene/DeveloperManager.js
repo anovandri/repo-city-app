@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { WAYPOINTS, ROAD_GRAPH, SLUG_TO_WP } from '../constants/waypoints.js';
+import { WAYPOINTS, ROAD_GRAPH } from '../constants/waypoints.js';
 
 const PI = Math.PI;
 
@@ -27,9 +27,10 @@ export class DeveloperManager {
    *   Live worker data from GET /api/workers. If empty, no developers are spawned.
    */
   constructor(scene, workers = []) {
-    this._scene    = scene;
-    this._devs     = [];
-    this._geoCache = new Map();
+    this._scene       = scene;
+    this._devs        = [];
+    this._geoCache    = new Map();
+    this._buildingMgr = null;  // set via setBuildingManager() after construction
 
     // Normalise from API format to internal format.
     // API: { displayName, role: 'ENGINEER', gender: 'MALE' }
@@ -45,6 +46,11 @@ export class DeveloperManager {
   }
 
   // ── Public API ───────────────────────────────────────────────────────────
+
+  /** Inject the BuildingManager so dispatch can find waypoints by building position. */
+  setBuildingManager(bm) {
+    this._buildingMgr = bm;
+  }
 
   /** Call once per animation frame. @param {number} delta seconds */
   update(delta) {
@@ -70,8 +76,8 @@ export class DeveloperManager {
    * @param {()=>void} onArrived  callback fired once the dev reaches the entrance
    */
   dispatch(actorName, repoSlug, onArrived) {
-    const wpIdx = SLUG_TO_WP[repoSlug];
-    if (wpIdx === undefined) {
+    const wpIdx = this._nearestWaypoint(repoSlug);
+    if (wpIdx === null) {
       // Unknown repo — fire immediately so the beam still appears
       onArrived?.();
       return;
@@ -477,6 +483,37 @@ export class DeveloperManager {
     dev._working  = false;
     dev._path     = null;
     dev.nextWpIdx = this._pickNext(dev);
+  }
+
+  /**
+   * Find the waypoint index nearest to a building's world position.
+   * Uses BuildingManager.getBuildingTop() so it always matches the actual
+   * rendered building — no hardcoded slug→index map needed.
+   *
+   * Only considers waypoints 0–46 (main road network; 47–52 are dead-end stubs).
+   *
+   * @param {string} slug
+   * @returns {number|null}  waypoint index, or null if building unknown
+   */
+  _nearestWaypoint(slug) {
+    if (!this._buildingMgr) return null;
+    const top = this._buildingMgr.getBuildingTop(slug);
+    if (!top) return null;
+
+    const MAIN_WPS = 47; // only search main road nodes 0–46
+    let bestIdx  = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < MAIN_WPS; i++) {
+      const wp   = WAYPOINTS[i];
+      const dx   = top.x - wp.x;
+      const dz   = top.z - wp.z;
+      const dist = dx * dx + dz * dz; // squared distance is fine for comparison
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx  = i;
+      }
+    }
+    return bestIdx;
   }
 
   /**
