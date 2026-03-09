@@ -2,6 +2,7 @@ package com.repocity.poller.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.repocity.citystate.event.PollCycleCompleted;
+import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.poller.repository.PollEventRepository;
@@ -17,6 +18,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -36,6 +38,9 @@ class EventDispatcherTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private GitlabUserRepository userRepo;
+
     @Captor
     private ArgumentCaptor<PollEvent> eventCaptor;
 
@@ -45,13 +50,16 @@ class EventDispatcherTest {
     void setUp() {
         // save() returns the argument so cycleEvents.add() receives real events
         when(eventRepo.save(any(PollEvent.class))).thenAnswer(inv -> inv.getArgument(0));
-        dispatcher = new EventDispatcher(eventRepo, new ObjectMapper(), eventPublisher);
+        // Default: display-name lookup returns empty → raw name used as fallback
+        when(userRepo.findByDisplayNameIgnoreCase(anyString())).thenReturn(Optional.empty());
+        dispatcher = new EventDispatcher(eventRepo, new ObjectMapper(), eventPublisher, userRepo);
     }
 
     // ── dispatchCommits ───────────────────────────────────────────
 
     @Test
     void dispatchCommits_savesOneEventPerCommit() {
+        // Both display names are unresolvable → raw name stored as fallback
         String json = """
                 [
                   {"id":"a1","author_name":"Aditya","message":"feat: init"},
@@ -66,8 +74,31 @@ class EventDispatcherTest {
 
         assertThat(saved).allMatch(e -> e.getEventType() == EventType.COMMIT);
         assertThat(saved).allMatch(e -> "ms-test".equals(e.getRepoSlug()));
+        // No user found for these display names → fallback: raw name stored
         assertThat(saved.get(0).getAuthorUsername()).isEqualTo("Aditya");
         assertThat(saved.get(1).getAuthorUsername()).isEqualTo("Wira");
+    }
+
+    @Test
+    void dispatchCommits_resolvesDisplayNameToGitlabUsername() {
+        // When the display name matches a GitlabUser, the canonical username is stored
+        com.repocity.identity.domain.GitlabUser user =
+                new com.repocity.identity.domain.GitlabUser(
+                        "Aditya Novandri",
+                        com.repocity.identity.domain.Gender.MALE,
+                        com.repocity.identity.domain.UserRole.ENGINEER);
+        user.setGitlabUsername("anovandri");
+        when(userRepo.findByDisplayNameIgnoreCase("Aditya Novandri"))
+                .thenReturn(Optional.of(user));
+
+        String json = """
+                [{"id":"c3","author_name":"Aditya Novandri","message":"chore: cleanup"}]
+                """;
+
+        dispatcher.dispatchCommits("ms-test", json);
+
+        verify(eventRepo).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAuthorUsername()).isEqualTo("anovandri");
     }
 
     @Test

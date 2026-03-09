@@ -3,6 +3,7 @@ package com.repocity.poller.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.repocity.citystate.event.PollCycleCompleted;
+import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.poller.repository.PollEventRepository;
@@ -36,33 +37,41 @@ public class EventDispatcher {
     private final PollEventRepository    eventRepo;
     private final ObjectMapper           mapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final GitlabUserRepository   userRepo;
 
     public EventDispatcher(PollEventRepository eventRepo,
                            ObjectMapper mapper,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           GitlabUserRepository userRepo) {
         this.eventRepo      = eventRepo;
         this.mapper         = mapper;
         this.eventPublisher = eventPublisher;
+        this.userRepo       = userRepo;
     }
 
     // ── Public dispatch methods — return only newly persisted events ───────────
 
     @Transactional
     public List<PollEvent> dispatchCommits(String repoSlug, String json) {
-        // Commits have no stable numeric id we can dedup on — always insert.
-        return dispatch(repoSlug, json, EventType.COMMIT, "author_name", "id", false);
+        // The GitLab Commits API does not expose a username — only author_name (free text)
+        // and author_email. We resolve author_name → gitlab_username here so that
+        // poll_events.author_username is always a canonical username matching gitlab_users,
+        // consistent with what MR / Pipeline events store.
+        return dispatch(repoSlug, json, EventType.COMMIT, "author_name", "id", false, true);
     }
 
     @Transactional
     public List<PollEvent> dispatchMergeRequests(String repoSlug, String json, EventType type) {
         // MRs carry a project-scoped iid — deduplicate so re-polls are safe.
-        return dispatch(repoSlug, json, type, "author", "iid", true);
+        // author.username is already the canonical GitLab username.
+        return dispatch(repoSlug, json, type, "author", "iid", true, false);
     }
 
     @Transactional
     public List<PollEvent> dispatchPipelines(String repoSlug, String json) {
         // Pipelines carry a numeric id — deduplicate.
-        return dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true);
+        // user.username is the canonical GitLab username; may be null for scheduled pipelines.
+        return dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true, false);
     }
 
     /**
@@ -84,7 +93,8 @@ public class EventDispatcher {
     // ── Private ────────────────────────────────────────────────────
 
     private List<PollEvent> dispatch(String repoSlug, String json, EventType type,
-                                     String authorField, String iidField, boolean dedup) {
+                                     String authorField, String iidField, boolean dedup,
+                                     boolean resolveAuthorByDisplayName) {
         List<PollEvent> saved = new ArrayList<>();
         try {
             JsonNode array = mapper.readTree(json);
@@ -103,8 +113,11 @@ public class EventDispatcher {
                     continue;
                 }
 
-                String author  = extractAuthor(node, authorField);
-                String payload = truncate(node.toString());
+                String rawAuthor = extractAuthor(node, authorField);
+                String author    = resolveAuthorByDisplayName
+                        ? resolveUsernameByDisplayName(rawAuthor)
+                        : rawAuthor;
+                String payload  = truncate(node.toString());
 
                 PollEvent event = new PollEvent(type, repoSlug, author, payload);
                 event.setGitlabIid(iid);
@@ -123,6 +136,23 @@ public class EventDispatcher {
             log.error("Failed to dispatch {} events for {}: {}", type, repoSlug, e.getMessage());
         }
         return saved;
+    }
+
+    /**
+     * Resolves a free-text display name (as returned by the GitLab Commits API {@code author_name}
+     * field) to the canonical {@code gitlab_username} stored in {@code gitlab_users}.
+     *
+     * <p>Falls back to the raw display name if no matching user is found, so the event is
+     * never lost — it just won't resolve to a city worker.
+     *
+     * @param displayName the {@code author_name} value from the GitLab API
+     * @return the matching {@code gitlab_username}, or {@code displayName} if unresolvable
+     */
+    private String resolveUsernameByDisplayName(String displayName) {
+        if (displayName == null || displayName.isBlank()) return null;
+        return userRepo.findByDisplayNameIgnoreCase(displayName)
+                .map(u -> u.getGitlabUsername())
+                .orElse(displayName);
     }
 
     private String extractAuthor(JsonNode node, String field) {
