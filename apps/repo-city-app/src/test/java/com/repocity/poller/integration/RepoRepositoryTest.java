@@ -89,7 +89,9 @@ class RepoRepositoryTest {
                 99999999L,
                 "🆕",
                 0,
-                com.repocity.identity.domain.RepoStatus.ACTIVE);
+                com.repocity.identity.domain.RepoStatus.ACTIVE,
+                "standalone",
+                7);
         repoRepo.save(newRepo);
 
         Optional<GitLabRepository> found = repoRepo.findBySlug("ms-new-service");

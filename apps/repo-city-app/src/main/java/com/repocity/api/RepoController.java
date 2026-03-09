@@ -62,6 +62,8 @@ public class RepoController {
                             repo.getIcon(),
                             repo.getOpenMrs(),
                             repo.getStatus(),
+                            repo.getDistrict(),
+                            repo.getFloors(),
                             mrListUrl
                     );
                 })

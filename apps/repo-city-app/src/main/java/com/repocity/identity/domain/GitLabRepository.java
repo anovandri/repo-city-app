@@ -44,6 +44,32 @@ public class GitLabRepository {
     private int openMrs;
 
     /**
+     * Base building height expressed as a floor count.
+     * The frontend uses this directly to scale the 3-D geometry; it does NOT
+     * derive height from {@code openMrs} so that the visual baseline is stable
+     * and only changes when a human intentionally edits the seed data.
+     * <p>
+     * Recommended range: 4 (small utility service) – 14 (EOC / critical platform).
+     * The frontend may add a small live bonus on top (e.g. +1 floor per open MR)
+     * to show current activity, but that is a pure visual layer.
+     */
+    @Column(name = "floors", nullable = false)
+    private int floors;
+
+    /**
+     * City district this repository belongs to.
+     * Drives the frontend layout engine to auto-assign building positions.
+     * <ul>
+     *   <li>{@code ms-partner} — NW district</li>
+     *   <li>{@code ms-pip}     — NE district</li>
+     *   <li>{@code standalone} — SE standalone area</li>
+     *   <li>{@code special}    — hand-placed (EOC, sunset repos)</li>
+     * </ul>
+     */
+    @Column(name = "district", nullable = false, length = 20)
+    private String district;
+
+    /**
      * Lifecycle status of this repository.
      * Controls the visual variant of the floating building label:
      * <ul>
@@ -57,12 +83,15 @@ public class GitLabRepository {
     private RepoStatus status;
 
     public GitLabRepository(String slug, String name, Long gitlabProjectId,
-                            String icon, int openMrs, RepoStatus status) {
+                            String icon, int openMrs, RepoStatus status,
+                            String district, int floors) {
         this.slug            = slug;
         this.name            = name;
         this.gitlabProjectId = gitlabProjectId;
         this.icon            = icon;
         this.openMrs         = openMrs;
         this.status          = status;
+        this.district        = district;
+        this.floors          = floors;
     }
 }

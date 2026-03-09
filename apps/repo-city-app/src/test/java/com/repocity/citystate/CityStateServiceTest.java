@@ -70,7 +70,7 @@ class CityStateServiceTest {
                                        new ObjectMapper().registerModule(new JavaTimeModule()));
 
         // Bootstrap: one repo, one developer
-        GitLabRepository repo = new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE);
+        GitLabRepository repo = new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE, "ms-partner", 8);
         GitlabUser user = new GitlabUser(DEV_NAME, Gender.MALE, UserRole.LEADER);
         user.setGitlabUsername(DEV_USER);
 
@@ -253,9 +253,9 @@ class CityStateServiceTest {
     @Test
     void persistSnapshot_savesSnapshotWithCorrectCounts() {
         // add a second repo to get count = 2
-        GitLabRepository repo2 = new GitLabRepository("partner-callback", "ms-partner-callback", 2L, "📞", 0, RepoStatus.ACTIVE);
+        GitLabRepository repo2 = new GitLabRepository("partner-callback", "ms-partner-callback", 2L, "📞", 0, RepoStatus.ACTIVE, "ms-partner", 7);
         when(repoRepo.findAll()).thenReturn(List.of(
-                new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE),
+                new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE, "ms-partner", 8),
                 repo2));
         when(userRepo.findAll()).thenReturn(List.of(
                 new GitlabUser(DEV_NAME, Gender.MALE, UserRole.LEADER)));

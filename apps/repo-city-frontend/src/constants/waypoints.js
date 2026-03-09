@@ -121,3 +121,29 @@ export const ROAD_GRAPH = [
   [43],             // 52
   [0, 44],          // 53
 ];
+
+/**
+ * Maps repo slug → entrance waypoint index (from prototype STRUCTURES).
+ * When a mutation arrives the dispatched developer walks to this waypoint
+ * first, then the beam fires on arrival.
+ */
+export const SLUG_TO_WP = {
+  'ms-partner-administration':        4,
+  'ms-partner-atome':                 8,
+  'ms-partner-callback':             47,
+  'ms-partner-callback-rate-limiter':12,
+  'ms-partner-customer':             15,
+  'ms-partner-gateway':              14,
+  'ms-partner-integration-platform':  9,
+  'ms-partner-registration':         13,
+  'ms-partner-transaction':          16,
+  'ms-partner-web':                  48,
+  'ms-pip-catalog':                  49,
+  'ms-pip-gateway':                  28,
+  'ms-pip-resource':                 31,
+  'ms-pip-transaction':              32,
+  'partner-webview-automation-test': 50,
+  'partnership-automation':          51,
+  'ms-ginpay':                       52,
+  'production-support':              53,
+};

@@ -3,6 +3,7 @@ import { CityCanvas } from './components/CityCanvas.jsx';
 import { HUD }        from './components/HUD.jsx';
 import { MRPanel }    from './components/MRPanel.jsx';
 import { DevPanel }   from './components/DevPanel.jsx';
+import { SimPanel }   from './components/SimPanel.jsx';
 import { Toast }      from './components/Toast.jsx';
 import { useWebSocket }  from './hooks/useWebSocket.js';
 import { useCityState }  from './hooks/useCityState.js';
@@ -21,6 +22,7 @@ export default function App() {
 
   const [showMR,  setShowMR]  = useState(false);
   const [showDev, setShowDev] = useState(false);
+  const [showSim, setShowSim] = useState(false);
   const [workers, setWorkers] = useState([]);
 
   useEffect(() => {
@@ -28,6 +30,19 @@ export default function App() {
       .then(r => r.ok ? r.json() : [])
       .catch(() => [])
       .then(setWorkers);
+  }, []);
+
+  // Option+S (macOS) / Alt+S (Windows/Linux) toggles the simulation panel.
+  // On macOS, Option+S produces the 'ß' character, so we check both.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.altKey && (e.key === 's' || e.key === 'S' || e.key === 'ß')) {
+        e.preventDefault();
+        setShowSim(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const { stats, mrMap, devActivity, applySnapshot, applyMutation } = useCityState(workers);
@@ -78,6 +93,9 @@ export default function App() {
       {/* Overlay panels */}
       {showMR  && <MRPanel  mrMap={mrMap}          onClose={() => setShowMR(false)} />}
       {showDev && <DevPanel workers={workers} devActivity={devActivity} onClose={() => setShowDev(false)} />}
+
+      {/* Simulation panel — toggle with Alt+S */}
+      {showSim && <SimPanel onClose={() => setShowSim(false)} />}
 
       {/* Toast notifications — bottom-center */}
       <Toast toastRef={toastRef} />

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { WAYPOINTS, ROAD_GRAPH } from '../constants/waypoints.js';
+import { WAYPOINTS, ROAD_GRAPH, SLUG_TO_WP } from '../constants/waypoints.js';
 
 const PI = Math.PI;
 
@@ -59,6 +59,54 @@ export class DeveloperManager {
   findByName(name) {
     const lower = name.toLowerCase();
     return this._devs.find(d => d.data.name.toLowerCase().includes(lower));
+  }
+
+  /**
+   * Dispatch a developer toward a building entrance, then invoke onArrived.
+   * Matches the prototype's fireCommitEvent / fireMREvent → arrive → activate pattern.
+   *
+   * @param {string}   actorName  displayName from mutation (partial match OK)
+   * @param {string}   repoSlug   slug string used to look up entrance waypoint
+   * @param {()=>void} onArrived  callback fired once the dev reaches the entrance
+   */
+  dispatch(actorName, repoSlug, onArrived) {
+    const wpIdx = SLUG_TO_WP[repoSlug];
+    if (wpIdx === undefined) {
+      // Unknown repo — fire immediately so the beam still appears
+      onArrived?.();
+      return;
+    }
+
+    // Find the dev by name, or fall back to a random non-leader non-working dev
+    let dev = actorName ? this.findByName(actorName) : null;
+    if (!dev || dev.role === 'leader' || dev._dispatched) {
+      const eligible = this._devs.filter(d => d.role !== 'leader' && !d._dispatched && !d._working);
+      dev = eligible.length > 0
+        ? eligible[Math.floor(Math.random() * eligible.length)]
+        : null;
+    }
+    if (!dev) {
+      onArrived?.();
+      return;
+    }
+
+    // BFS full path from current waypoint to destination
+    const path = this._bfsPath(dev.wpIdx, wpIdx);
+    if (!path || path.length < 2) {
+      // Already there or unreachable — fire immediately
+      onArrived?.();
+      return;
+    }
+
+    // Show task bubble above the dev's head while walking
+    this._showTaskBubble(dev, hint);
+
+    // Mark as dispatched so they won't be double-dispatched by another event
+    dev._dispatched   = true;
+    dev._onArrived    = onArrived;
+    dev._destWpIdx    = wpIdx;
+    dev._path         = path.slice(1); // remaining hops (excluding current wp)
+    dev.nextWpIdx     = dev._path.shift();
   }
 
   dispose() {
@@ -343,6 +391,7 @@ export class DeveloperManager {
   }
 
   _walkDev(dev, delta) {
+    if (dev._working) return;       // freeze at building while in typing pose
     if (dev.nextWpIdx === null) return;
 
     const target = WAYPOINTS[dev.nextWpIdx];
@@ -354,10 +403,33 @@ export class DeveloperManager {
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     if (dist < 0.25) {
-      // Snap to waypoint and pick next — matches prototype arrival threshold
+      // Snap to waypoint
       dev.group.position.set(target.x, 0, target.z);
-      dev.wpIdx     = dev.nextWpIdx;
-      dev.nextWpIdx = this._pickNext(dev);
+      dev.wpIdx = dev.nextWpIdx;
+
+      // ── Dispatched arrival check ──────────────────────────────
+      if (dev._dispatched && dev.wpIdx === dev._destWpIdx) {
+        dev._dispatched = false;
+        dev._path       = null;
+        const cb = dev._onArrived;
+        dev._onArrived = null;
+        dev._destWpIdx = null;
+
+        // Strike a brief "working" pose (arms raised), then release after 7 s
+        this._setWorking(dev);
+        setTimeout(() => this._releaseWorking(dev), 7000);
+
+        // Fire the beam callback immediately on arrival
+        cb?.();
+      } else if (dev._dispatched && dev._path && dev._path.length > 0) {
+        // Follow pre-computed BFS path hop by hop
+        dev.nextWpIdx = dev._path.shift();
+      } else if (dev._dispatched) {
+        // Path exhausted but not at dest yet — re-route (fallback)
+        dev.nextWpIdx = this._routeToward(dev.wpIdx, dev._destWpIdx);
+      } else {
+        dev.nextWpIdx = this._pickNext(dev);
+      }
     } else {
       // Move dev.speed world-units per frame (prototype uses raw speed per frame
       // with requestAnimationFrame ~60fps; we scale by delta*60 to stay frame-rate
@@ -371,6 +443,17 @@ export class DeveloperManager {
   }
 
   _animateLimbs(dev, delta) {
+    // If working (arrived at building), do typing-tap animation
+    if (dev._working) {
+      dev.limbTime += delta * 8;
+      const tap = Math.sin(dev.limbTime) * 0.12;
+      const { armL, armR, legL, legR } = dev.group.userData;
+      if (armL) armL.rotation.x = -0.6 + tap;
+      if (armR) armR.rotation.x = -0.6 - tap;
+      if (legL) legL.rotation.x = 0;
+      if (legR) legR.rotation.x = 0;
+      return;
+    }
     dev.limbTime += delta * 6; // matches prototype's sin(t * 6 + phase)
     const swing = Math.sin(dev.limbTime) * 0.4;
     const { armL, armR, legL, legR } = dev.group.userData;
@@ -378,5 +461,60 @@ export class DeveloperManager {
     if (legR) legR.rotation.x = -swing;
     if (armL) armL.rotation.x = -swing * 0.75;
     if (armR) armR.rotation.x =  swing * 0.75;
+  }
+
+  /** Freeze limbs in "typing at desk" pose */
+  _setWorking(dev) {
+    dev._working = true;
+    const { armL, armR, legL, legR } = dev.group.userData;
+    if (armL) armL.rotation.x = -0.6;
+    if (armR) armR.rotation.x = -0.6;
+    if (legL) legL.rotation.x = 0;
+    if (legR) legR.rotation.x = 0;
+  }
+
+  /** Release working state and resume normal walking */
+  _releaseWorking(dev) {
+    dev._working = false;
+    dev.nextWpIdx = this._pickNext(dev);
+  }
+
+  /**
+   * BFS shortest path from startIdx to destIdx.
+   * Returns the full array of waypoint indices [startIdx, …, destIdx],
+   * or null if unreachable.
+   */
+  _bfsPath(startIdx, destIdx) {
+    if (startIdx === destIdx) return [startIdx];
+    const visited = new Set([startIdx]);
+    const queue   = [[startIdx]];   // each entry is a path array
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const node = path[path.length - 1];
+      for (const neighbour of (ROAD_GRAPH[node] ?? [])) {
+        if (visited.has(neighbour)) continue;
+        const newPath = [...path, neighbour];
+        if (neighbour === destIdx) return newPath;
+        visited.add(neighbour);
+        queue.push(newPath);
+      }
+    }
+    return null; // unreachable
+  }
+
+  /**
+   * Greedy one-hop fallback (used only if BFS path is exhausted unexpectedly).
+   */
+  _routeToward(fromIdx, destIdx) {
+    const neighbours = ROAD_GRAPH[fromIdx];
+    if (!neighbours || neighbours.length === 0) return fromIdx;
+    const dest = WAYPOINTS[destIdx];
+    let best = neighbours[0];
+    let bestDist = WAYPOINTS[best].distanceTo(dest);
+    for (let i = 1; i < neighbours.length; i++) {
+      const d = WAYPOINTS[neighbours[i]].distanceTo(dest);
+      if (d < bestDist) { bestDist = d; best = neighbours[i]; }
+    }
+    return best;
   }
 }

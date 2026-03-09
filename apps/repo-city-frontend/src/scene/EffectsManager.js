@@ -1,36 +1,43 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { REPOS } from '../constants/repos.js';
 
 /**
- * AnimationHint values from the backend CityMutationMessage.
+ * AnimationHint values — must match CityMutation.AnimationHint enum on the backend.
  */
 export const HINT = {
-  COMMIT_BEAM:    'COMMIT_BEAM',
-  MR_BEAM:        'MR_BEAM',
-  MERGE_SUCCESS:  'MERGE_SUCCESS',
-  PIPELINE_BEAM:  'PIPELINE_BEAM',
+  COMMIT_BEAM:      'COMMIT_BEAM',
+  MR_OPENED_BEAM:   'MR_OPENED_BEAM',
+  MERGE_SUCCESS:    'MERGE_SUCCESS',
+  PIPELINE_RUNNING: 'PIPELINE_RUNNING',
+  PIPELINE_SUCCESS: 'PIPELINE_SUCCESS',
+  PIPELINE_FAILED:  'PIPELINE_FAILED',
 };
 
 const BEAM_COLORS = {
-  [HINT.COMMIT_BEAM]:   0x44ddff,
-  [HINT.MR_BEAM]:       0xcc44ff,
-  [HINT.MERGE_SUCCESS]: 0x66ff88,
-  [HINT.PIPELINE_BEAM]: 0x66ddff,
+  [HINT.COMMIT_BEAM]:      0x44ddff,
+  [HINT.MR_OPENED_BEAM]:   0xcc44ff,
+  [HINT.MERGE_SUCCESS]:    0x66ff88,
+  [HINT.PIPELINE_RUNNING]: 0x66ddff,
+  [HINT.PIPELINE_SUCCESS]: 0x44ffaa,
+  [HINT.PIPELINE_FAILED]:  0xff4444,
 };
 
 const EVENT_ICONS = {
-  [HINT.COMMIT_BEAM]:   '🔨',
-  [HINT.MR_BEAM]:       '🔀',
-  [HINT.MERGE_SUCCESS]: '✅',
-  [HINT.PIPELINE_BEAM]: '⚙️',
+  [HINT.COMMIT_BEAM]:      '🔨',
+  [HINT.MR_OPENED_BEAM]:   '🔀',
+  [HINT.MERGE_SUCCESS]:    '✅',
+  [HINT.PIPELINE_RUNNING]: '⚙️',
+  [HINT.PIPELINE_SUCCESS]: '🟢',
+  [HINT.PIPELINE_FAILED]:  '🔴',
 };
 
 const EFFECT_DURATION = {
-  [HINT.COMMIT_BEAM]:   7.0,
-  [HINT.MR_BEAM]:       8.5,
-  [HINT.MERGE_SUCCESS]: 4.0,
-  [HINT.PIPELINE_BEAM]: 5.0,
+  [HINT.COMMIT_BEAM]:      7.0,
+  [HINT.MR_OPENED_BEAM]:   8.5,
+  [HINT.MERGE_SUCCESS]:    4.0,
+  [HINT.PIPELINE_RUNNING]: 5.0,
+  [HINT.PIPELINE_SUCCESS]: 4.0,
+  [HINT.PIPELINE_FAILED]:  6.0,
 };
 
 /**
@@ -48,11 +55,13 @@ export class EffectsManager {
    * @param {THREE.Scene} scene
    * @param {import('./BuildingManager').BuildingManager} buildingManager
    * @param {(msg: string, type: string) => void} onToast
+   * @param {import('./DeveloperManager').DeveloperManager} [developerManager]
    */
-  constructor(scene, buildingManager, onToast) {
+  constructor(scene, buildingManager, onToast, developerManager) {
     this._scene          = scene;
     this._buildingMgr    = buildingManager;
     this._onToast        = onToast;
+    this._developerMgr   = developerManager ?? null;
     this._activeEffects  = [];
   }
 
@@ -60,18 +69,48 @@ export class EffectsManager {
 
   /**
    * Trigger a visual effect for a CityMutationMessage.
+   * If a DeveloperManager is wired in, the named actor first walks to the
+   * building entrance before the beam fires — exactly like the prototype.
    * @param {{ type: string, repoSlug: string, actorDisplayName: string,
    *           animationHint: string, repoIcon: string }} mutation
    */
   trigger(mutation) {
-    const hint   = mutation.animationHint || mutation.type;
-    const repo   = REPOS.find(r => r.name === mutation.repoSlug);
-    if (!repo) return;
+    const hint = mutation.animationHint || mutation.type;
+    const top  = this._buildingMgr.getBuildingTop(mutation.repoSlug);
+    if (!top) return;
 
-    const top    = this._buildingMgr.getBuildingTop(repo.id);
-    const color  = BEAM_COLORS[hint]     ?? 0xffffff;
-    const icon   = EVENT_ICONS[hint]     ?? '⚡';
-    const dur    = EFFECT_DURATION[hint] ?? 5.0;
+    const color = BEAM_COLORS[hint]     ?? 0xffffff;
+    const icon  = EVENT_ICONS[hint]     ?? '⚡';
+    const dur   = EFFECT_DURATION[hint] ?? 5.0;
+
+    // Build the toast message now (before any async delay)
+    const actorName = mutation.actorDisplayName ?? 'Someone';
+    const repoIcon  = mutation.repoIcon ?? '🏢';
+    const repoSlug  = mutation.repoSlug ?? '';
+    const messages = {
+      [HINT.COMMIT_BEAM]:      `${icon} ${actorName} committed to ${repoIcon} ${repoSlug}`,
+      [HINT.MR_OPENED_BEAM]:   `${icon} ${actorName} opened MR on ${repoIcon} ${repoSlug}`,
+      [HINT.MERGE_SUCCESS]:    `${icon} ${actorName} merged to ${repoIcon} ${repoSlug}`,
+      [HINT.PIPELINE_RUNNING]: `${icon} Pipeline running on ${repoIcon} ${repoSlug}`,
+      [HINT.PIPELINE_SUCCESS]: `${icon} Pipeline passed on ${repoIcon} ${repoSlug}`,
+      [HINT.PIPELINE_FAILED]:  `${icon} Pipeline FAILED on ${repoIcon} ${repoSlug}`,
+    };
+    const toastMsg = messages[hint] ?? `${icon} Activity on ${repoSlug}`;
+
+    // ── Dispatch developer to building first, then fire beam on arrival ───
+    const fireBeam = () => this._spawnBeamEffect(mutation, top, color, icon, dur, toastMsg);
+
+    if (this._developerMgr) {
+      this._developerMgr.dispatch(actorName, repoSlug, fireBeam);
+    } else {
+      fireBeam();
+    }
+  }
+
+  // ── Internal: spawn the beam + light + label + toast ────────────────────
+
+  _spawnBeamEffect(mutation, top, color, icon, dur, toastMsg) {
+    const hint = mutation.animationHint || mutation.type;
 
     // Evict oldest if at capacity
     if (this._activeEffects.length >= EffectsManager.MAX_ACTIVE) {
@@ -81,19 +120,27 @@ export class EffectsManager {
 
     const effect = { age: 0, duration: dur, meshes: [], lights: [], labels: [] };
 
-    // Vertical beam
-    const beamGeo = new THREE.CylinderGeometry(0.12, 0.12, 1, 6, 1, true);
+    // ── Vertical light beam ──────────────────────────────────────────────
+    // Tall tapered cone (narrow top, wide base) rising from the rooftop.
+    // AdditiveBlending makes it glow brightly without darkening surroundings.
+    const BEAM_H  = 100;
+    const beamGeo = new THREE.CylinderGeometry(0.3, 2.5, BEAM_H, 10, 1, true);
     const beamMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.85, side: THREE.DoubleSide,
+      color,
+      transparent: true,
+      opacity:     0,           // fades in via update()
+      depthWrite:  false,
+      blending:    THREE.AdditiveBlending,
+      side:        THREE.DoubleSide,
     });
     const beam = new THREE.Mesh(beamGeo, beamMat);
-    beam.position.copy(top);
-    beam.position.y += 0.5;
+    beam.position.set(top.x, top.y + BEAM_H / 2, top.z);
+    beam.renderOrder = 1;
     this._scene.add(beam);
     effect.meshes.push({ mesh: beam, mat: beamMat, role: 'beam' });
 
-    // Point light at building top
-    const light = new THREE.PointLight(color, 0, 18);
+    // Point light at building top — visible citywide
+    const light = new THREE.PointLight(color, 0, 28, 1.4);
     light.position.copy(top);
     this._scene.add(light);
     effect.lights.push(light);
@@ -109,11 +156,12 @@ export class EffectsManager {
     this._scene.add(label);
     effect.labels.push({ label, div });
 
-    // Merge burst sphere
+    // Merge burst sphere — expands outward from the rooftop
     if (hint === HINT.MERGE_SUCCESS) {
-      const burstGeo = new THREE.SphereGeometry(0.8, 8, 6);
+      const burstGeo = new THREE.SphereGeometry(2.0, 10, 8);
       const burstMat = new THREE.MeshBasicMaterial({
-        color: 0x66ff88, transparent: true, opacity: 0.6, wireframe: true,
+        color: 0x66ff88, transparent: true, opacity: 0.5,
+        depthWrite: false, blending: THREE.AdditiveBlending, wireframe: true,
       });
       const burst = new THREE.Mesh(burstGeo, burstMat);
       burst.position.copy(top);
@@ -121,8 +169,8 @@ export class EffectsManager {
       effect.meshes.push({ mesh: burst, mat: burstMat, role: 'burst' });
     }
 
-    // Glow 4 windows
-    const windows = this._buildingMgr.getWindows(repo.id);
+    // Glow windows
+    const windows = this._buildingMgr.getWindows(mutation.repoSlug);
     windows.slice(0, 4).forEach(w => {
       if (w.material) {
         w.material = new THREE.MeshBasicMaterial({
@@ -133,14 +181,7 @@ export class EffectsManager {
     });
 
     // Toast notification
-    const actorName = mutation.actorDisplayName ?? 'Someone';
-    const messages = {
-      [HINT.COMMIT_BEAM]:   `${icon} ${actorName} committed to ${repo.icon} ${repo.id}`,
-      [HINT.MR_BEAM]:       `${icon} ${actorName} opened MR on ${repo.icon} ${repo.id}`,
-      [HINT.MERGE_SUCCESS]: `${icon} ${actorName} merged to ${repo.icon} ${repo.id}`,
-      [HINT.PIPELINE_BEAM]: `${icon} Pipeline ${mutation.type === 'PIPELINE_FAILED' ? 'failed' : 'passed'} on ${repo.icon} ${repo.id}`,
-    };
-    this._onToast?.(messages[hint] ?? `${icon} Activity on ${repo.id}`, hint);
+    this._onToast?.(toastMsg, hint);
 
     this._activeEffects.push(effect);
   }
@@ -165,7 +206,11 @@ export class EffectsManager {
 
       eff.meshes.forEach(({ mat, role }) => {
         if (role === 'beam') {
-          mat.opacity = fade * 0.85;
+          // Fade in quickly (first 15% of duration), then hold, then fade out
+          const beamOpacity = t < 0.15
+            ? (t / 0.15) * 0.72
+            : fade * 0.72;
+          mat.opacity = beamOpacity;
         } else if (role === 'burst') {
           mat.opacity = fade * 0.6;
         }
@@ -176,13 +221,6 @@ export class EffectsManager {
       if (burst) {
         const s = 1 + t * 5;
         burst.mesh.scale.setScalar(s);
-      }
-
-      // Scale beam height
-      const beam = eff.meshes.find(m => m.role === 'beam');
-      if (beam) {
-        beam.mesh.scale.y = 1 + t * 20;
-        beam.mesh.position.y += delta * 4;
       }
 
       if (eff.age >= eff.duration) {

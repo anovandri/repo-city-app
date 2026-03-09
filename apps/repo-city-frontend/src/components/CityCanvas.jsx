@@ -39,7 +39,7 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast }) 
       const sceneMgr     = new SceneManager(canvas);
       const buildingMgr  = new BuildingManager(sceneMgr.scene, apiRepos);
       const developerMgr = new DeveloperManager(sceneMgr.scene, apiWorkers);
-      const effectsMgr   = new EffectsManager(sceneMgr.scene, buildingMgr, onToast);
+      const effectsMgr   = new EffectsManager(sceneMgr.scene, buildingMgr, onToast, developerMgr);
       const labelMgr     = new LabelManager(sceneMgr.scene);
 
       // Expose imperative API to App
