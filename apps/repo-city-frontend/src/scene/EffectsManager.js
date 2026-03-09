@@ -72,6 +72,7 @@ export class EffectsManager {
    * Phase 1 (immediate): a floating icon appears above the building.
    * Phase 2 (on arrival): icon is removed, beam + light fire — exactly like the prototype.
    * @param {{ type: string, repoSlug: string, actorDisplayName: string,
+   *           actorGitlabUsername: string|null,
    *           animationHint: string, repoIcon: string }} mutation
    */
   trigger(mutation) {
@@ -84,13 +85,15 @@ export class EffectsManager {
     const dur   = EFFECT_DURATION[hint] ?? 5.0;
 
     // Build the toast message now (before any async delay)
-    const actorName = mutation.actorDisplayName ?? 'Someone';
+    // null actorGitlabUsername (pipeline/bot) → dispatch picks a random dev
+    const actorUsername = mutation.actorGitlabUsername || null;
+    const actorLabel    = mutation.actorDisplayName || 'Pipeline';
     const repoIcon  = mutation.repoIcon ?? '🏢';
     const repoSlug  = mutation.repoSlug ?? '';
     const messages = {
-      [HINT.COMMIT_BEAM]:      `${icon} ${actorName} committed to ${repoIcon} ${repoSlug}`,
-      [HINT.MR_OPENED_BEAM]:   `${icon} ${actorName} opened MR on ${repoIcon} ${repoSlug}`,
-      [HINT.MERGE_SUCCESS]:    `${icon} ${actorName} merged to ${repoIcon} ${repoSlug}`,
+      [HINT.COMMIT_BEAM]:      `${icon} ${actorLabel} committed to ${repoIcon} ${repoSlug}`,
+      [HINT.MR_OPENED_BEAM]:   `${icon} ${actorLabel} opened MR on ${repoIcon} ${repoSlug}`,
+      [HINT.MERGE_SUCCESS]:    `${icon} ${actorLabel} merged to ${repoIcon} ${repoSlug}`,
       [HINT.PIPELINE_RUNNING]: `${icon} Pipeline running on ${repoIcon} ${repoSlug}`,
       [HINT.PIPELINE_SUCCESS]: `${icon} Pipeline passed on ${repoIcon} ${repoSlug}`,
       [HINT.PIPELINE_FAILED]:  `${icon} Pipeline FAILED on ${repoIcon} ${repoSlug}`,
@@ -113,7 +116,7 @@ export class EffectsManager {
     };
 
     if (this._developerMgr) {
-      this._developerMgr.dispatch(actorName, repoSlug, fireBeam);
+      this._developerMgr.dispatch(actorUsername, repoSlug, fireBeam);
     } else {
       // No developer manager — fire immediately (fallback)
       fireBeam();

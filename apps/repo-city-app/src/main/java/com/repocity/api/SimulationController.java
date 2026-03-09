@@ -4,7 +4,9 @@ import com.repocity.citystate.event.CityMutation;
 import com.repocity.citystate.event.CityMutation.AnimationHint;
 import com.repocity.citystate.event.CityMutationEvent;
 import com.repocity.identity.domain.Gender;
+import com.repocity.identity.domain.GitlabUser;
 import com.repocity.identity.domain.UserRole;
+import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.domain.PollEvent.EventType;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,12 +33,6 @@ import java.util.Random;
 @RequestMapping("/api/simulate")
 public class SimulationController {
 
-    /** Fake developer names rotated for visual variety. */
-    private static final List<String> FAKE_ACTORS = List.of(
-            "Rizki Ekaputri", "Budi Santoso", "Siti Rahayu",
-            "Andi Wijaya", "Dewi Kusuma", "Fajar Nugroho"
-    );
-
     /** Maps request event-type strings to AnimationHint values. */
     private static final Map<String, AnimationHint> HINT_MAP = Map.of(
             "COMMIT",           AnimationHint.COMMIT_BEAM,
@@ -59,12 +55,15 @@ public class SimulationController {
 
     private final ApplicationEventPublisher eventPublisher;
     private final RepoRepository            repoRepository;
+    private final GitlabUserRepository      gitlabUserRepository;
     private final Random                    rng = new Random();
 
     public SimulationController(ApplicationEventPublisher eventPublisher,
-                                RepoRepository repoRepository) {
-        this.eventPublisher = eventPublisher;
-        this.repoRepository = repoRepository;
+                                RepoRepository repoRepository,
+                                GitlabUserRepository gitlabUserRepository) {
+        this.eventPublisher       = eventPublisher;
+        this.repoRepository       = repoRepository;
+        this.gitlabUserRepository = gitlabUserRepository;
     }
 
     /**
@@ -73,7 +72,7 @@ public class SimulationController {
      * @param repoSlug  full repo slug e.g. {@code "ms-partner-gateway"}
      * @param eventType one of COMMIT, MR_OPENED, MR_MERGED,
      *                  PIPELINE_RUNNING, PIPELINE_SUCCESS, PIPELINE_FAILED
-     * @param actor     optional actor display name (random if omitted)
+     * @param actor     optional actor gitlabUsername (random real worker if omitted)
      */
     public record SimulateRequest(
             String repoSlug,
@@ -105,10 +104,18 @@ public class SimulationController {
                 .map(r -> r.getIcon())
                 .orElse("🏢");
 
-        // Pick a random (or specified) actor
-        String actorName = (req.actor() != null && !req.actor().isBlank())
-                ? req.actor()
-                : FAKE_ACTORS.get(rng.nextInt(FAKE_ACTORS.size()));
+        // Look up worker by gitlabUsername, or pick a random real worker
+        GitlabUser worker = (req.actor() != null && !req.actor().isBlank())
+                ? gitlabUserRepository.findByGitlabUsername(req.actor()).orElse(null)
+                : null;
+        if (worker == null) {
+            List<GitlabUser> all = gitlabUserRepository.findAll();
+            worker = all.isEmpty() ? null : all.get(rng.nextInt(all.size()));
+        }
+        String   actorName          = worker != null ? worker.getDisplayName()    : "Unknown";
+        String   actorGitlabUsername = worker != null ? worker.getGitlabUsername() : null;
+        UserRole actorRole           = worker != null ? worker.getRole()           : UserRole.ENGINEER;
+        Gender   actorGender         = worker != null ? worker.getGender()         : Gender.MALE;
 
         EventType eventType = EVENT_TYPE_MAP.getOrDefault(req.eventType().toUpperCase(), EventType.COMMIT);
 
@@ -117,8 +124,9 @@ public class SimulationController {
                 .repoSlug(req.repoSlug())
                 .repoIcon(repoIcon)
                 .actorDisplayName(actorName)
-                .actorRole(UserRole.ENGINEER)
-                .actorGender(rng.nextBoolean() ? Gender.MALE : Gender.FEMALE)
+                .actorGitlabUsername(actorGitlabUsername)
+                .actorRole(actorRole)
+                .actorGender(actorGender)
                 .animationHint(hint)
                 .newBuildingFloors(rng.nextInt(5) + 1)
                 .newOpenMrCount(rng.nextInt(8))
@@ -158,12 +166,20 @@ public class SimulationController {
         }
 
         String[] eventTypes = HINT_MAP.keySet().toArray(new String[0]);
+        List<GitlabUser> allWorkers = gitlabUserRepository.findAll();
         List<Map<String, String>> fired = new java.util.ArrayList<>();
 
         for (int i = 0; i < count; i++) {
             String slug      = slugs.get(rng.nextInt(slugs.size()));
             String eventType = eventTypes[rng.nextInt(eventTypes.length)];
-            String actor     = FAKE_ACTORS.get(rng.nextInt(FAKE_ACTORS.size()));
+
+            GitlabUser worker = allWorkers.isEmpty()
+                    ? null
+                    : allWorkers.get(rng.nextInt(allWorkers.size()));
+            String   actor              = worker != null ? worker.getDisplayName()    : "Unknown";
+            String   actorGitlabUsername = worker != null ? worker.getGitlabUsername() : null;
+            UserRole actorRole           = worker != null ? worker.getRole()           : UserRole.ENGINEER;
+            Gender   actorGender         = worker != null ? worker.getGender()         : Gender.MALE;
 
             String repoIcon = repoRepository.findBySlug(slug)
                     .map(r -> r.getIcon())
@@ -177,8 +193,9 @@ public class SimulationController {
                     .repoSlug(slug)
                     .repoIcon(repoIcon)
                     .actorDisplayName(actor)
-                    .actorRole(UserRole.ENGINEER)
-                    .actorGender(rng.nextBoolean() ? Gender.MALE : Gender.FEMALE)
+                    .actorGitlabUsername(actorGitlabUsername)
+                    .actorRole(actorRole)
+                    .actorGender(actorGender)
                     .animationHint(hint)
                     .newBuildingFloors(rng.nextInt(5) + 1)
                     .newOpenMrCount(rng.nextInt(8))

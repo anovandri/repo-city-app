@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { WAYPOINTS, ROAD_GRAPH, SLUG_TO_WP } from '../constants/waypoints.js';
+import { WAYPOINTS, ROAD_GRAPH } from '../constants/waypoints.js';
 
 const PI = Math.PI;
 
@@ -23,7 +23,7 @@ const CARETAKER_WPS = [0, 53];
 export class DeveloperManager {
   /**
    * @param {THREE.Scene} scene
-   * @param {Array<{displayName:string, role:string, gender:string}>} workers
+   * @param {Array<{displayName:string, gitlabUsername:string, role:string, gender:string}>} workers
    *   Live worker data from GET /api/workers. If empty, no developers are spawned.
    */
   constructor(scene, workers = []) {
@@ -33,13 +33,13 @@ export class DeveloperManager {
     this._buildingMgr = null;  // set via setBuildingManager() after construction
 
     // Normalise from API format to internal format.
-    // API: { displayName, role: 'ENGINEER', gender: 'MALE' }
-    // Internal: { name, role: 'engineer', gender: 'male' }
+    // API: { displayName, gitlabUsername, role: 'ENGINEER', gender: 'MALE' }
+    // Internal: { name, gitlabUsername, role: 'engineer', gender: 'male' }
     const source = workers.map(w => ({
-      name:   w.displayName,
-      gitlab: w.displayName,
-      role:   (w.role   ?? '').toLowerCase(),
-      gender: (w.gender ?? 'male').toLowerCase(),
+      name:          w.displayName,
+      gitlabUsername: w.gitlabUsername ?? '',
+      role:          (w.role   ?? '').toLowerCase(),
+      gender:        (w.gender ?? 'male').toLowerCase(),
     }));
 
     this._buildAll(source);
@@ -61,19 +61,31 @@ export class DeveloperManager {
     });
   }
 
-  /** Find dev by name (case-insensitive partial). */
+  /** Find dev by name (case-insensitive partial). Only returns idle devs (not dispatched or working). */
   findByName(name) {
     const lower = name.toLowerCase();
-    return this._devs.find(d => d.data.name.toLowerCase().includes(lower));
+    return this._devs.find(d =>
+      d.data.name.toLowerCase().includes(lower) &&
+      !d._dispatched && !d._working
+    );
+  }
+
+  /** Find dev by exact gitlabUsername. Only returns idle devs (not dispatched or working). */
+  findByUsername(username) {
+    if (!username) return undefined;
+    return this._devs.find(d =>
+      d.data.gitlabUsername === username &&
+      !d._dispatched && !d._working
+    );
   }
 
   /**
    * Dispatch a developer toward a building entrance, then invoke onArrived.
    * Matches the prototype's fireCommitEvent / fireMREvent → arrive → activate pattern.
    *
-   * @param {string}   actorName  displayName from mutation (partial match OK)
-   * @param {string}   repoSlug   slug string used to look up entrance waypoint
-   * @param {()=>void} onArrived  callback fired once the dev reaches the entrance
+   * @param {string|null} actorName  gitlabUsername from mutation (exact match), or null for random
+   * @param {string}      repoSlug   slug string used to look up entrance waypoint
+   * @param {()=>void}    onArrived  callback fired once the dev reaches the entrance
    */
   dispatch(actorName, repoSlug, onArrived) {
     const wpIdx = this._nearestWaypoint(repoSlug);
@@ -486,38 +498,33 @@ export class DeveloperManager {
   }
 
   /**
-   * Find the entrance waypoint index for a building.
-   *
-   * Priority:
-   *   1. SLUG_TO_WP — the prototype's authoritative entrance map (includes dead-end stubs 47–52)
-   *   2. Dynamic nearest-waypoint fallback (main road nodes 0–46 only) for slugs
-   *      added after the prototype was written.
+   * Find the nearest main-road waypoint (0–46) to a building's world position.
+   * All repos now sit exactly on main-road nodes, so a pure nearest-neighbor
+   * search is sufficient — no stub mapping needed.
    *
    * @param {string} slug
    * @returns {number|null}  waypoint index, or null if building unknown
    */
   _nearestWaypoint(slug) {
-    // 1. Prefer the known entrance map — handles dead-end stubs correctly
-    if (SLUG_TO_WP[slug] !== undefined) return SLUG_TO_WP[slug];
-
-    // 2. Dynamic fallback for any slug not in the static map
     if (!this._buildingMgr) return null;
     const top = this._buildingMgr.getBuildingTop(slug);
     if (!top) return null;
 
-    const MAIN_WPS = 47; // only search main road nodes 0–46
+    const MAIN_WPS = 47;
     let bestIdx  = 0;
     let bestDist = Infinity;
     for (let i = 0; i < MAIN_WPS; i++) {
       const wp   = WAYPOINTS[i];
       const dx   = top.x - wp.x;
       const dz   = top.z - wp.z;
-      const dist = dx * dx + dz * dz; // squared distance is fine for comparison
+      const dist = dx * dx + dz * dz;
       if (dist < bestDist) {
         bestDist = dist;
         bestIdx  = i;
       }
     }
+
+    console.debug(`[DeveloperManager] _nearestWaypoint: ${slug} → wp${bestIdx} (dist²=${bestDist.toFixed(0)}) building=(${top.x},${top.z})`);
     return bestIdx;
   }
 

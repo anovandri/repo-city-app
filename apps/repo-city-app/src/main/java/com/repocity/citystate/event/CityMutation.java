@@ -49,6 +49,9 @@ public class CityMutation {
     /** Developer's human-readable display name. May be null if author was unresolvable. */
     private final String actorDisplayName;
 
+    /** Developer's unique GitLab username. May be null if actor was unresolvable or event is bot-driven. */
+    private final String actorGitlabUsername;
+
     /** Developer's role. May be null if actor was unresolvable. */
     private final UserRole actorRole;
 

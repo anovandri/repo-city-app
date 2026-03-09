@@ -24,12 +24,23 @@ export default function App() {
   const [showDev, setShowDev] = useState(false);
   const [showSim, setShowSim] = useState(false);
   const [workers, setWorkers] = useState([]);
+  // slug → gitlabMrListUrl (populated on mount from /api/repos)
+  const [mrListUrls, setMrListUrls] = useState({});
 
   useEffect(() => {
     fetch('/api/workers', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : [])
       .catch(() => [])
       .then(setWorkers);
+
+    fetch('/api/repos', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => [])
+      .then(repos => {
+        const map = {};
+        repos.forEach(r => { if (r.gitlabMrListUrl) map[r.slug] = r.gitlabMrListUrl; });
+        setMrListUrls(map);
+      });
   }, []);
 
   // Option+S (macOS) / Alt+S (Windows/Linux) toggles the simulation panel.
@@ -91,7 +102,7 @@ export default function App() {
       />
 
       {/* Overlay panels */}
-      {showMR  && <MRPanel  mrMap={mrMap}          onClose={() => setShowMR(false)} />}
+      {showMR  && <MRPanel  mrMap={mrMap} mrListUrls={mrListUrls} onClose={() => setShowMR(false)} />}
       {showDev && <DevPanel workers={workers} devActivity={devActivity} onClose={() => setShowDev(false)} />}
 
       {/* Simulation panel — toggle with Alt+S */}

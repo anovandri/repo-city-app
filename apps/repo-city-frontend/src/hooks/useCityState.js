@@ -45,22 +45,22 @@ export function useCityState(workers = []) {
    * @param {import('../types').CitySnapshotMessage} snapshot
    */
   const applySnapshot = useCallback(snapshot => {
-    // Stats
+    // Compute total open MRs from district list (most accurate source)
+    const totalOpenMrs = snapshot.districts?.reduce((s, d) => s + (d.openMrCount ?? 0), 0) ?? 0;
+
     setStats({
       repoCount:            REPOS.length,
       activeDeveloperCount: snapshot.stats?.activeDeveloperCount ?? 0,
       totalCommits:         snapshot.stats?.totalCommits          ?? 0,
-      openMrCount:          snapshot.stats?.openMrCount           ?? 0,
+      openMrCount:          snapshot.stats?.openMrCount           ?? totalOpenMrs,
     });
 
-    // MR map from districts
+    // MR map — keyed by repoSlug, sourced from districts
     if (snapshot.districts?.length) {
       setMrMap(prev => {
         const next = { ...prev };
         snapshot.districts.forEach(d => {
-          if (d.repoSlug && next[d.repoSlug] !== undefined) {
-            next[d.repoSlug] = d.openMrCount ?? 0;
-          }
+          if (d.repoSlug) next[d.repoSlug] = d.openMrCount ?? 0;
         });
         return next;
       });
@@ -90,9 +90,8 @@ export function useCityState(workers = []) {
     // Update per-repo MR count
     if (newOpenMrCount !== undefined && repoSlug) {
       setMrMap(prev => {
-        if (prev[repoSlug] === undefined) return prev;
         const next = { ...prev, [repoSlug]: newOpenMrCount };
-        // Also update total in stats
+        // Recalculate total open MRs and push into stats
         const total = Object.values(next).reduce((a, v) => a + v, 0);
         setStats(s => ({ ...s, openMrCount: total }));
         return next;

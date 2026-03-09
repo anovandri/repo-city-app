@@ -159,10 +159,10 @@ export class SceneManager {
     // ── District ground tiles ────────────────────────────────────
     // ms-partner: plane(72,60,0x3d7a5e,-44,0.01,-34)
     plane(72, 60, 0x3d7a5e, -44, 0.01, -34);
-    // ms-pip: plane(32,32,0x3a6a9a,36,0.01,-38)
-    plane(32, 32, 0x3a6a9a, 36, 0.01, -38);
-    // standalone: plane(28,14,0x8a7a3a,36,0.01,20)
-    plane(28, 14, 0x8a7a3a, 36, 0.01, 20);
+    // ms-pip: plane(32,56,0x3a6a9a,36,0.01,-42)  — expanded for 3 rows
+    plane(32, 56, 0x3a6a9a, 36, 0.01, -42);
+    // SW park district ground
+    plane(52, 36, 0x4ab84a, -38, 0.01, 20);
 
     // ── Park grid — 16-unit tiles, LINE_W=0.12 ──────────────────
     const TILE = 16, HALF = 80, LINE_W = 0.12, LINE_H = 0.012;
@@ -272,7 +272,7 @@ export class SceneManager {
     const ZONES = [
       { label: '🤝 ms-partner', color: 0x2a5a6a, x:  -8, z: -10 },
       { label: '📦 ms-pip',     color: 0x8a6a2a, x:  12, z: -10 },
-      { label: '🔧 Standalone', color: 0x4a6a3a, x:  32, z:  10 },
+      { label: '🌳 City Park',  color: 0x2a6a2a, x: -12, z:  10 },
     ];
     ZONES.forEach(zone => {
       cyl(0.07, 0.09, 2.2, 0x5a3a1a, zone.x, 1.1, zone.z);
@@ -312,11 +312,78 @@ export class SceneManager {
     bush(34, -30); bush(29, -33);
     bench(32, -31, 0); bench(32, -34, Math.PI);
 
-    // Park F: standalone district pocket
-    parkPad(32, 6, 7, 6);
-    tree(30, 5, 1.8, 1.0); tree(34, 8, 2.0, 1.2);
-    bush(31, 8); bush(34, 5);
-    bench(32, 6, Math.PI / 2);
+    // Park F: ms-pip inner courtyard (expanded for 3-col grid)
+    parkPad(32, -44, 7, 6);
+    tree(30, -42, 2.0, 1.2); tree(34, -46, 1.9, 1.1); tree(31, -46, 1.7, 1.0);
+    bush(34, -42); bush(29, -45);
+    bench(32, -43, 0); bench(32, -46, Math.PI);
+
+    // ── SW City Park ─────────────────────────────────────────────
+    // Large grass pad
+    parkPad(-38, 20, 48, 32);
+
+    // Pond (blue ellipse, slightly raised)
+    {
+      const pondMat = new THREE.MeshLambertMaterial({ color: 0x3a8fbf });
+      const pond = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 0.06, 32), pondMat);
+      pond.scale.set(1.6, 1, 1.0);
+      pond.position.set(-38, 0.04, 20);
+      s.add(pond);
+      // Pond rim
+      cyl(5.8, 5.8, 0.12, 0xb0a070, -38, 0.06, 20);
+    }
+
+    // Footpath through the park (N–S and E–W)
+    plane(2, 30, 0xd4c090, -38, 0.02, 20);   // N–S path
+    plane(44, 2, 0xd4c090, -38, 0.02, 20);   // E–W path
+
+    // Tree grove — perimeter and scattered
+    // West edge
+    tree(-58, 10, 2.4, 1.5); tree(-58, 16, 2.2, 1.4); tree(-58, 22, 2.6, 1.6);
+    tree(-58, 28, 2.3, 1.5); tree(-58, 34, 2.1, 1.3);
+    // East edge
+    tree(-18, 10, 2.2, 1.4); tree(-18, 16, 2.4, 1.5); tree(-18, 28, 2.3, 1.4);
+    tree(-18, 34, 2.0, 1.3);
+    // North edge
+    tree(-28,  8, 2.3, 1.4); tree(-38,  8, 2.5, 1.5); tree(-48,  8, 2.2, 1.3);
+    // South edge
+    tree(-28, 34, 2.1, 1.3); tree(-38, 34, 2.4, 1.5); tree(-48, 34, 2.2, 1.4);
+    tree(-58, 34, 2.0, 1.3);
+    // Pond-side cluster
+    tree(-30, 14, 1.9, 1.1); tree(-46, 14, 2.0, 1.2);
+    tree(-30, 26, 1.8, 1.0); tree(-46, 26, 2.1, 1.2);
+
+    // Bushes along paths and pond
+    bush(-28, 20); bush(-48, 20);
+    bush(-38, 10); bush(-38, 30);
+    bush(-32, 16); bush(-44, 16); bush(-32, 24); bush(-44, 24);
+
+    // Benches facing the pond
+    bench(-28, 18,  Math.PI / 2);   // east side, facing west
+    bench(-48, 18, -Math.PI / 2);   // west side, facing east
+    bench(-38, 12,  0);             // north side, facing south
+    bench(-38, 28,  Math.PI);       // south side, facing north
+    bench(-28, 30,  Math.PI / 4);   // SE corner
+    bench(-48, 30, -Math.PI / 4);   // SW corner
+
+    // Lamp posts along paths
+    lamp(-38,  8); lamp(-38, 32);
+    lamp(-22, 20); lamp(-54, 20);
+    lamp(-28, 20); lamp(-48, 20);
+
+    // Park entrance gate posts
+    box(0.4, 2.4, 0.4, 0x888877, -14, 1.2, 20);   // east post
+    box(0.4, 2.4, 0.4, 0x888877, -14, 1.2, 18);   // east post pair
+    // Gate arch lintel
+    box(0.6, 0.2, 2.8, 0x888877, -14, 2.5, 19);
+    // Gate sign
+    const parkAnchor = new THREE.Object3D();
+    parkAnchor.position.set(-22, 3.2, 20);
+    s.add(parkAnchor);
+    const parkDiv = document.createElement('div');
+    parkDiv.className = 'clan-label';
+    parkDiv.innerHTML = '<span class="clan-icon">🌳</span>City Park';
+    parkAnchor.add(new CSS2DObject(parkDiv));
   }
 
   _initControls() {

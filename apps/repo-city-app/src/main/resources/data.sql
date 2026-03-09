@@ -27,10 +27,10 @@ INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, open_mrs, 
   ('ms-pip-gateway',                   'ms-pip-gateway',                   64936428, '💳',  0, 'ACTIVE',       'ms-pip',      8),
   ('ms-pip-resource',                  'ms-pip-resource',                  61779778, '🗄️',  2, 'ACTIVE',       'ms-pip',      7),
   ('ms-pip-transaction',               'ms-pip-transaction',               70763772, '🔀',  4, 'ACTIVE',       'ms-pip',      8),
-  ('partner-webview-automation-test',  'partner-webview-automation-test',  39967557, '🤖',  1, 'ACTIVE',       'standalone',  7),
-  ('partnership-automation',           'partnership-automation',           38539076, '🤝',  0, 'ACTIVE',       'standalone',  7),
+  ('partner-webview-automation-test',  'partner-webview-automation-test',  39967557, '🤖',  1, 'ACTIVE',       'ms-pip',      7),
+  ('partnership-automation',           'partnership-automation',           38539076, '🤝',  0, 'ACTIVE',       'ms-pip',      7),
   -- Maintenance/sunset repo — rendered with ⚠️ "SUNSET SOON" badge
-  ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️',  0, 'MAINTENANCE',  'special',     6),
+  ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️',  0, 'MAINTENANCE',  'ms-pip',      6),
   -- Production support — always-hot EOC building; rendered with 🚨 "LIVE" badge
   ('production-support',               'production-support',               99000001, '🚨',  8, 'ACTIVE',       'special',    14);
 

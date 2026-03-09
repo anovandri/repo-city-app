@@ -18,7 +18,6 @@ INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, open_mrs, 
   ('ms-partner-callback-rate-limiter', 'ms-partner-callback-rate-limiter', 55838912, '⏱️',  2, 'ACTIVE',       'ms-partner',  7),
   ('ms-partner-customer',              'ms-partner-customer',              35828382, '👤',  4, 'ACTIVE',       'ms-partner',  7),
   ('ms-partner-gateway',               'ms-partner-gateway',               35163042, '🌐',  0, 'ACTIVE',       'ms-partner',  8),
-  ('ms-partner-integration-platform',  'ms-partner-integration-platform',  37347000, '🔗',  7, 'ACTIVE',       'ms-partner',  8),
   ('ms-partner-registration',          'ms-partner-registration',          48122034, '📋',  2, 'ACTIVE',       'ms-partner',  7),
   ('ms-partner-transaction',           'ms-partner-transaction',           36804883, '💸',  6, 'ACTIVE',       'ms-partner',  9),
   ('ms-partner-web',                   'ms-partner-web',                   45029157, '🖥️',  1, 'ACTIVE',       'ms-partner',  7),
@@ -26,10 +25,10 @@ INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, open_mrs, 
   ('ms-pip-gateway',                   'ms-pip-gateway',                   64936428, '💳',  0, 'ACTIVE',       'ms-pip',      8),
   ('ms-pip-resource',                  'ms-pip-resource',                  61779778, '🗄️',  2, 'ACTIVE',       'ms-pip',      7),
   ('ms-pip-transaction',               'ms-pip-transaction',               70763772, '🔀',  4, 'ACTIVE',       'ms-pip',      8),
-  ('partner-webview-automation-test',  'partner-webview-automation-test',  39967557, '🤖',  1, 'ACTIVE',       'standalone',  7),
-  ('partnership-automation',           'partnership-automation',           38539076, '🤝',  0, 'ACTIVE',       'standalone',  7),
+  ('partner-webview-automation-test',  'partner-webview-automation-test',  39967557, '🤖',  1, 'ACTIVE',       'ms-pip',      7),
+  ('partnership-automation',           'partnership-automation',           38539076, '🤝',  0, 'ACTIVE',       'ms-pip',      7),
   -- Maintenance/sunset repo — rendered with ⚠️ "SUNSET SOON" badge
-  ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️',  0, 'MAINTENANCE',  'special',     6)
+  ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️',  0, 'MAINTENANCE',  'ms-pip',      6)
 ON CONFLICT (slug) DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────

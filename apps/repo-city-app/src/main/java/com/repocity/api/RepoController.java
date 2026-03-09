@@ -92,6 +92,7 @@ public class RepoController {
         List<WorkerSummary> body = gitlabUserRepository.findAll().stream()
                 .map(u -> new WorkerSummary(
                         u.getDisplayName(),
+                        u.getGitlabUsername(),
                         u.getRole().name(),
                         u.getGender().name()
                 ))

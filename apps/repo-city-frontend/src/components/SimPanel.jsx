@@ -182,15 +182,16 @@ const S = {
 // ─── component ───────────────────────────────────────────────────────────────
 
 export function SimPanel({ onClose }) {
-  const [repos,       setRepos]       = useState([]);
+  const [repos,        setRepos]        = useState([]);
+  const [workers,      setWorkers]      = useState([]);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedType, setSelectedType] = useState('COMMIT');
-  const [actor,       setActor]       = useState('');
-  const [burstCount,  setBurstCount]  = useState(5);
-  const [lastResult,  setLastResult]  = useState(null); // { ok, text }
-  const [firing,      setFiring]      = useState(false);
+  const [actor,        setActor]        = useState('');
+  const [burstCount,   setBurstCount]   = useState(5);
+  const [lastResult,   setLastResult]   = useState(null); // { ok, text }
+  const [firing,       setFiring]       = useState(false);
 
-  // Load repo list on mount
+  // Load repo list and worker list on mount
   useEffect(() => {
     fetch('/api/repos', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : [])
@@ -199,6 +200,11 @@ export function SimPanel({ onClose }) {
         setRepos(data);
         if (data.length > 0) setSelectedRepo(data[0].slug);
       });
+
+    fetch('/api/workers', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => [])
+      .then(data => setWorkers(data));
   }, []);
 
   const fire = useCallback(async () => {
@@ -211,7 +217,7 @@ export function SimPanel({ onClose }) {
         body: JSON.stringify({
           repoSlug:  selectedRepo,
           eventType: selectedType,
-          actor:     actor.trim() || undefined,
+          actor:     actor || undefined,
         }),
       });
       const data = await res.json();
@@ -283,14 +289,18 @@ export function SimPanel({ onClose }) {
 
       {/* Actor override */}
       <label style={{ ...S.label, marginTop: '6px' }}>Actor (optional)</label>
-      <input
-        type="text"
-        style={S.actorInput}
-        placeholder="Random actor if blank"
+      <select
+        style={S.select}
         value={actor}
         onChange={e => setActor(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && fire()}
-      />
+      >
+        <option value="">— Random —</option>
+        {workers.map(w => (
+          <option key={w.gitlabUsername ?? w.displayName} value={w.gitlabUsername ?? ''}>
+            {w.displayName}{w.gitlabUsername ? ` (@${w.gitlabUsername})` : ''}
+          </option>
+        ))}
+      </select>
 
       {/* Fire button */}
       <button style={S.fireBtn(!selectedRepo || firing)} onClick={fire} disabled={!selectedRepo || firing}>

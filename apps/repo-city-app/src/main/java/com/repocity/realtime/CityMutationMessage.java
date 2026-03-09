@@ -27,6 +27,9 @@ public record CityMutationMessage(
         /** Human-readable developer name (drives avatar label in the frontend). */
         String actorDisplayName,
 
+        /** Unique GitLab username for exact dev matching in the frontend. May be null. */
+        String actorGitlabUsername,
+
         /** Developer role (used for avatar type selection). */
         UserRole actorRole,
 
@@ -65,6 +68,7 @@ public record CityMutationMessage(
                 mutation.getRepoSlug(),
                 mutation.getRepoIcon(),
                 mutation.getActorDisplayName(),
+                mutation.getActorGitlabUsername(),
                 mutation.getActorRole(),
                 mutation.getActorGender(),
                 mutation.getAnimationHint() != null ? mutation.getAnimationHint().name() : null,

@@ -14,24 +14,34 @@
  *   +x → East, −x → West, +z → South, −z → North
  *
  * District map:
- *   ms-partner  NW   origin (−64, 0, −8)   grid grows East (+x) then South (+z)
- *   ms-pip      NE   origin ( 24, 0, −24)   grid grows East (+x) then South (+z)
- *   standalone  SE   origin ( 24, 0,  20)   single row, grows East (+x)
- *   special     —    fixed positions per slug (EOC, ginpay)
+ *   ms-partner  NW   origin (−64, 0, −8)   grid grows East (+x) then North (−z)
+ *   ms-pip      NE   origin ( 24, 0, −24)   grid grows East (+x) then North (−z)
+ *   special     —    fixed positions per slug (production-support)
+ *
+ * ms-pip grid slots (cols=3, colSpacing=8, rowSpacing=16, rowDir=-1):
+ *   row 0: (24,-24)=wp26  (32,-24)=wp27  (40,-24)=wp28
+ *   row 1: (24,-40)=wp29  (32,-40)=wp30  (40,-40)=wp31
+ *   row 2: (24,-56)=wp32  …
+ * All slots are exact main-road waypoints — no stub mapping needed.
  */
 
-/** Grid spacing between building centres. */
+/** Default grid spacing between building centres (used for rows and cols unless overridden). */
 const SPACING = 16;
 
 /**
  * District grid configurations.
- * origin: [x, z] of the first (top-left) slot.
- * cols:   max buildings per row before wrapping to the next row.
+ * origin:    [x, z] of the first (nearest-to-plaza) slot.
+ * cols:      max buildings per row before wrapping to the next row.
+ * rowDir:    direction rows grow — +1 = south (+z), -1 = north (−z).
+ * colSpacing: x-distance between columns (defaults to SPACING).
+ * rowSpacing: z-distance between rows    (defaults to SPACING).
+ *
+ * ms-pip uses colSpacing=8 because its NE-district waypoints sit at
+ * x = 24, 32, 40 (8-unit steps), while row spacing stays 16.
  */
 const DISTRICT_GRID = {
-  'ms-partner': { origin: [-64, -8],  cols: 4 },
-  'ms-pip':     { origin: [ 24, -24], cols: 2 },
-  'standalone': { origin: [ 24,  20], cols: 4 },
+  'ms-partner': { origin: [-64, -8],  cols: 4, rowDir: -1 },
+  'ms-pip':     { origin: [ 24, -24], cols: 3, rowDir: -1, colSpacing: 8 },
 };
 
 /**
@@ -39,8 +49,7 @@ const DISTRICT_GRID = {
  * Keyed by slug.
  */
 const SPECIAL_POSITIONS = {
-  'ms-ginpay':         [  8, -36 ],
-  'production-support':[ 20,   0 ],
+  'production-support': [ 20, 0 ],
 };
 
 /**
@@ -75,11 +84,14 @@ export function computeLayout(apiRepos) {
       console.warn(`DistrictLayout: unknown district "${district}" — skipping`);
       continue;
     }
-    const [ox, oz] = cfg.origin;
+    const [ox, oz]   = cfg.origin;
+    const rowDir     = cfg.rowDir    ?? 1;
+    const colSpacing = cfg.colSpacing ?? SPACING;
+    const rowSpacing = SPACING;
     repos.forEach((repo, idx) => {
       const col = idx % cfg.cols;
       const row = Math.floor(idx / cfg.cols);
-      layout.set(repo.slug, [ox + col * SPACING, oz + row * SPACING]);
+      layout.set(repo.slug, [ox + col * colSpacing, oz + row * rowSpacing * rowDir]);
     });
   }
 

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { REPOS } from '../constants/repos.js';
 
-const GITLAB_BASE = 'https://gitlab.com';
+const GITLAB_NAMESPACE = 'https://gitlab.com/dk-digital-bank/services';
 
 function mrBadgeClass(count) {
   if (count >= 6) return 'mr-badge high';
@@ -14,10 +14,11 @@ function mrBadgeClass(count) {
  * MRPanel — overlay listing all repos sorted by open MR count.
  *
  * Props:
- *   mrMap  — { [repoName]: count }
- *   onClose— () => void
+ *   mrMap       — { [repoSlug]: count }
+ *   mrListUrls  — { [repoSlug]: gitlabMrListUrl } from /api/repos
+ *   onClose     — () => void
  */
-export const MRPanel = React.memo(function MRPanel({ mrMap, onClose }) {
+export const MRPanel = React.memo(function MRPanel({ mrMap, mrListUrls = {}, onClose }) {
   const sorted = useMemo(() => {
     return REPOS
       .map(r => ({ ...r, count: mrMap[r.name] ?? 0 }))
@@ -28,6 +29,13 @@ export const MRPanel = React.memo(function MRPanel({ mrMap, onClose }) {
     () => sorted.reduce((s, r) => s + r.count, 0),
     [sorted],
   );
+
+  // Build the MR list URL: prefer the backend-provided URL (which has the real
+  // namespace path), fall back to constructing one from the known namespace.
+  function mrUrl(slug) {
+    return mrListUrls[slug]
+      ?? `${GITLAB_NAMESPACE}/${slug}/-/merge_requests`;
+  }
 
   return (
     <div className="panel-overlay mr-panel">
@@ -41,7 +49,7 @@ export const MRPanel = React.memo(function MRPanel({ mrMap, onClose }) {
           <a
             key={repo.id}
             className="mr-row"
-            href={`${GITLAB_BASE}/${repo.name}/-/merge_requests`}
+            href={mrUrl(repo.name)}
             target="_blank"
             rel="noreferrer"
           >

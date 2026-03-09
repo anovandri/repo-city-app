@@ -161,9 +161,10 @@ public class CityStateService {
 
         // Resolve author — may be null if the author field wasn't in the payload
         Optional<GitlabUser> authorOpt = resolveAuthor(event.getAuthorUsername());
-        String  actorDisplayName = authorOpt.map(GitlabUser::getDisplayName).orElse(event.getAuthorUsername());
-        UserRole actorRole       = authorOpt.map(GitlabUser::getRole).orElse(UserRole.ENGINEER);
-        Gender   actorGender     = authorOpt.map(GitlabUser::getGender).orElse(Gender.MALE);
+        String  actorDisplayName    = authorOpt.map(GitlabUser::getDisplayName).orElse(event.getAuthorUsername());
+        String  actorGitlabUsername = authorOpt.map(GitlabUser::getGitlabUsername).orElse(event.getAuthorUsername());
+        UserRole actorRole          = authorOpt.map(GitlabUser::getRole).orElse(UserRole.ENGINEER);
+        Gender   actorGender        = authorOpt.map(GitlabUser::getGender).orElse(Gender.MALE);
 
         // Move worker to this district
         if (actorDisplayName != null) {
@@ -175,6 +176,7 @@ public class CityStateService {
                 .repoSlug(event.getRepoSlug())
                 .repoIcon(district.getRepoIcon())
                 .actorDisplayName(actorDisplayName)
+                .actorGitlabUsername(actorGitlabUsername)
                 .actorRole(actorRole)
                 .actorGender(actorGender)
                 .eventType(event.getEventType());
