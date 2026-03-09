@@ -40,7 +40,6 @@ const S = {
     color: '#c8d8f0',
     backdropFilter: 'blur(12px)',
     boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-    userSelect: 'none',
   },
   header: {
     display: 'flex',
@@ -85,6 +84,8 @@ const S = {
     marginBottom: '10px',
     appearance: 'none',
     cursor: 'pointer',
+    userSelect: 'text',
+    pointerEvents: 'all',
   },
   actorInput: {
     width: '100%',
@@ -98,6 +99,8 @@ const S = {
     marginBottom: '12px',
     boxSizing: 'border-box',
     outline: 'none',
+    userSelect: 'text',
+    pointerEvents: 'all',
   },
   gridRow: {
     display: 'grid',

@@ -79,7 +79,7 @@ export class DeveloperManager {
 
     // Find the dev by name, or fall back to a random non-leader non-working dev
     let dev = actorName ? this.findByName(actorName) : null;
-    if (!dev || dev.role === 'leader' || dev._dispatched) {
+    if (!dev || dev.role === 'leader' || dev._dispatched || dev._working) {
       const eligible = this._devs.filter(d => d.role !== 'leader' && !d._dispatched && !d._working);
       dev = eligible.length > 0
         ? eligible[Math.floor(Math.random() * eligible.length)]
@@ -97,9 +97,6 @@ export class DeveloperManager {
       onArrived?.();
       return;
     }
-
-    // Show task bubble above the dev's head while walking
-    this._showTaskBubble(dev, hint);
 
     // Mark as dispatched so they won't be double-dispatched by another event
     dev._dispatched   = true;
@@ -193,7 +190,9 @@ export class DeveloperManager {
       } else if (isCaretaker) {
         startWp = CARETAKER_WPS[idx % 2];
       } else {
-        startWp = Math.floor(Math.random() * WAYPOINTS.length);
+        // Use only the main road network nodes (0-46, 53) to avoid dead-end stubs
+        const MAIN_WPS = 47; // indices 0-46 are all well-connected main nodes
+        startWp = Math.floor(Math.random() * MAIN_WPS);
       }
 
       const speed = isLeader ? 0
@@ -475,7 +474,8 @@ export class DeveloperManager {
 
   /** Release working state and resume normal walking */
   _releaseWorking(dev) {
-    dev._working = false;
+    dev._working  = false;
+    dev._path     = null;
     dev.nextWpIdx = this._pickNext(dev);
   }
 

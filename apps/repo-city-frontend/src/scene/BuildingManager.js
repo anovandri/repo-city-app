@@ -73,7 +73,7 @@ export class BuildingManager {
    */
   getBuildingTop(slug) {
     const repo = this._repoMeta[slug];
-    if (!repo) return new THREE.Vector3();
+    if (!repo) return null;
     const y = this._roofY.get(slug) ?? repo.floors;
     return new THREE.Vector3(repo.x, y, repo.z);
   }

@@ -69,8 +69,8 @@ export class EffectsManager {
 
   /**
    * Trigger a visual effect for a CityMutationMessage.
-   * If a DeveloperManager is wired in, the named actor first walks to the
-   * building entrance before the beam fires — exactly like the prototype.
+   * Phase 1 (immediate): a floating icon appears above the building.
+   * Phase 2 (on arrival): icon is removed, beam + light fire — exactly like the prototype.
    * @param {{ type: string, repoSlug: string, actorDisplayName: string,
    *           animationHint: string, repoIcon: string }} mutation
    */
@@ -97,12 +97,25 @@ export class EffectsManager {
     };
     const toastMsg = messages[hint] ?? `${icon} Activity on ${repoSlug}`;
 
-    // ── Dispatch developer to building first, then fire beam on arrival ───
-    const fireBeam = () => this._spawnBeamEffect(mutation, top, color, icon, dur, toastMsg);
+    // ── Phase 1: Show waiting icon above the building immediately ────────
+    const waitDiv = document.createElement('div');
+    waitDiv.className = 'event-indicator';
+    waitDiv.classList.add(`event-${hint.toLowerCase().replace(/_beam$/, '').replace(/_success$/, '')}`);
+    waitDiv.textContent = icon;
+    const waitLabel = new CSS2DObject(waitDiv);
+    waitLabel.position.set(top.x, top.y + 3, top.z);
+    this._scene.add(waitLabel);
+
+    // ── Phase 2: On arrival — remove waiting icon, fire beam + light ─────
+    const fireBeam = () => {
+      this._scene.remove(waitLabel);
+      this._spawnBeamEffect(mutation, top, color, icon, dur, toastMsg);
+    };
 
     if (this._developerMgr) {
       this._developerMgr.dispatch(actorName, repoSlug, fireBeam);
     } else {
+      // No developer manager — fire immediately (fallback)
       fireBeam();
     }
   }
@@ -145,10 +158,10 @@ export class EffectsManager {
     this._scene.add(light);
     effect.lights.push(light);
 
-    // Floating icon label
+    // Floating icon label anchored above building (shown while beam is active)
     const div = document.createElement('div');
     div.className = 'event-indicator';
-    div.classList.add(`event-${hint.toLowerCase().replace('_beam', '').replace('_success', '')}`);
+    div.classList.add(`event-${hint.toLowerCase().replace(/_beam$/, '').replace(/_success$/, '')}`);
     div.textContent = icon;
     const label = new CSS2DObject(div);
     label.position.copy(top);
