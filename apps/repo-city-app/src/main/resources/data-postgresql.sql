@@ -1,17 +1,12 @@
 -- ─────────────────────────────────────────────────────────────────
 --  Seed: 17 GitLab repositories
---  slug              : used as the stable key linking backend events to FE district config
+--  slug              : stable key linking backend events to FE district config
 --  name              : display label shown as the floating building label in the city UI
 --  gitlab_project_id : numeric GitLab project ID (stable across renames)
 --  status            : ACTIVE | INACTIVE | MAINTENANCE
---                        ACTIVE      → normal development
---                        INACTIVE    → no recent activity; building dimmed
---                        MAINTENANCE → sunset/maintenance mode; renders ⚠️ badge in the city
+--  ON CONFLICT DO NOTHING = safe to re-run on every boot (prod & dev)
 --
---  NOTE: 3D building positions (x, y, z) live in the frontend REPOS config — they are a
---        visual/layout concern of the Three.js scene, not domain data.
---
---  Plain INSERT — safe for H2 (create-drop always starts with empty tables)
+--  NOTE: 3D building positions (x, y, z) live in the frontend REPOS config.
 -- ─────────────────────────────────────────────────────────────────
 INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, open_mrs, status) VALUES
   ('ms-partner-administration',        'ms-partner-administration',        37347452, '🛡️',  3, 'ACTIVE'),
@@ -30,10 +25,9 @@ INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, open_mrs, 
   ('ms-pip-transaction',               'ms-pip-transaction',               70763772, '🔀', 4, 'ACTIVE'),
   ('partner-webview-automation-test',  'partner-webview-automation-test',  39967557, '🤖', 1, 'ACTIVE'),
   ('partnership-automation',           'partnership-automation',           38539076, '🤝', 0, 'ACTIVE'),
-  -- Maintenance/sunset repo — rendered with ⚠️ "SUNSET SOON" badge
   ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️', 0, 'MAINTENANCE'),
-  -- Production support — always-hot EOC building; rendered with 🚨 "� LIVE" badge
-  ('production-support',               'production-support',               99000001, '🚨', 8, 'ACTIVE');
+  ('production-support',               'production-support',               99000001, '🛠️', 8, 'ACTIVE')
+ON CONFLICT (slug) DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────
 --  Seed: 36 GitLab users
@@ -74,4 +68,5 @@ INSERT INTO gitlab_users (display_name, gitlab_username, gender, role) VALUES
   ('Tommi Irawan',     '@tommi.irawan', 'MALE',   'ENGINEER'),
   ('Wina',             '@wina.finka1', 'FEMALE', 'ENGINEER'),
   ('Wira',             '@siwananda-dk', 'MALE',   'LEADER'),
-  ('Yuni Marlina',     '@yunimmarlina', 'FEMALE', 'ENGINEER');
+  ('Yuni Marlina',     '@yunimmarlina', 'FEMALE', 'ENGINEER')
+ON CONFLICT (gitlab_username) DO NOTHING;

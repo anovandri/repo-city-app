@@ -2,6 +2,7 @@ package com.repocity.poller.service;
 
 import com.repocity.poller.client.GitLabClient;
 import com.repocity.identity.domain.GitLabRepository;
+import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.repository.PollEventRepository;
@@ -14,6 +15,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -41,6 +44,14 @@ public class PollerService {
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(
                     Thread.ofVirtual().name("poller-scheduler").factory());
+
+    /**
+     * Thread-safe accumulator for newly saved events across all repos in a single
+     * poll cycle.  Cleared at the start of each cycle; drained into
+     * {@link EventDispatcher#publishCycleCompleted} at the end.
+     */
+    private final List<PollEvent> cycleEvents =
+            Collections.synchronizedList(new ArrayList<>());
 
     private volatile Instant lastPoll = null;
 
@@ -92,6 +103,8 @@ public class PollerService {
         lastPoll = Instant.now();
         log.info("Polling {} repos (since={})", repos.size(), since);
 
+        cycleEvents.clear();
+
         List<Future<?>> futures = repos.stream()
                 .<Future<?>>map(repo -> vtExecutor.submit(() -> pollRepo(repo, since)))
                 .toList();
@@ -107,6 +120,9 @@ public class PollerService {
                 log.error("Poll task failed: {}", e.getMessage());
             }
         }
+
+        // Notify city-state module of all newly persisted events this cycle
+        dispatcher.publishCycleCompleted(new ArrayList<>(cycleEvents));
     }
 
     private void pollRepo(GitLabRepository repo, Instant since) {
@@ -115,15 +131,15 @@ public class PollerService {
         try {
             // Commits
             String commits = gitLabClient.fetchCommits(projectId, since);
-            dispatcher.dispatchCommits(slug, commits);
+            cycleEvents.addAll(dispatcher.dispatchCommits(slug, commits));
 
             // Open MRs
             String openMrs = gitLabClient.fetchMergeRequests(projectId, "opened");
-            dispatcher.dispatchMergeRequests(slug, openMrs, EventType.MR_OPENED);
+            cycleEvents.addAll(dispatcher.dispatchMergeRequests(slug, openMrs, EventType.MR_OPENED));
 
             // Merged MRs (only recent ones via since filter)
             String mergedMrs = gitLabClient.fetchMergeRequests(projectId, "merged");
-            dispatcher.dispatchMergeRequests(slug, mergedMrs, EventType.MR_MERGED);
+            cycleEvents.addAll(dispatcher.dispatchMergeRequests(slug, mergedMrs, EventType.MR_MERGED));
 
             // Refresh the open MR count: opened iids that have NOT been merged yet.
             int freshOpenMrs = (int) pollEventRepo.countOpenMrs(slug);
@@ -135,7 +151,7 @@ public class PollerService {
 
             // Pipelines
             String pipelines = gitLabClient.fetchPipelines(projectId, since);
-            dispatcher.dispatchPipelines(slug, pipelines);
+            cycleEvents.addAll(dispatcher.dispatchPipelines(slug, pipelines));
 
         } catch (Exception e) {
             log.error("Error polling repo {}: {}", slug, e.getMessage());

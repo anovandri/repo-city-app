@@ -1,6 +1,7 @@
 package com.repocity.poller.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.repocity.citystate.event.PollCycleCompleted;
 import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.poller.repository.PollEventRepository;
@@ -11,10 +12,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -22,10 +27,14 @@ import static org.mockito.Mockito.*;
  * The repository is mocked; no Spring context or DB is required.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class EventDispatcherTest {
 
     @Mock
     private PollEventRepository eventRepo;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Captor
     private ArgumentCaptor<PollEvent> eventCaptor;
@@ -34,7 +43,9 @@ class EventDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new EventDispatcher(eventRepo, new ObjectMapper());
+        // save() returns the argument so cycleEvents.add() receives real events
+        when(eventRepo.save(any(PollEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        dispatcher = new EventDispatcher(eventRepo, new ObjectMapper(), eventPublisher);
     }
 
     // ── dispatchCommits ───────────────────────────────────────────
@@ -160,5 +171,30 @@ class EventDispatcherTest {
     void dispatchPipelines_emptyArray_savesNothing() {
         dispatcher.dispatchPipelines("api-gateway", "[]");
         verifyNoInteractions(eventRepo);
+    }
+
+    // ── publishCycleCompleted ─────────────────────────────────────
+
+    @Test
+    void publishCycleCompleted_publishesSpringEventWithAllNewEvents() {
+        String commitJson = "[{\"id\":\"abc\",\"author_name\":\"dev\"}]";
+        List<PollEvent> saved = dispatcher.dispatchCommits("ms-test", commitJson);
+
+        dispatcher.publishCycleCompleted(saved);
+
+        ArgumentCaptor<PollCycleCompleted> captor =
+                ArgumentCaptor.forClass(PollCycleCompleted.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        PollCycleCompleted published = captor.getValue();
+        assertThat(published.getNewEvents()).hasSize(1);
+        assertThat(published.getNewEvents().get(0).getRepoSlug()).isEqualTo("ms-test");
+        assertThat(published.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    void publishCycleCompleted_emptyList_doesNotPublish() {
+        dispatcher.publishCycleCompleted(List.of());
+        verifyNoInteractions(eventPublisher);
     }
 }

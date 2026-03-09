@@ -37,7 +37,7 @@ class RepoRepositoryTest {
 
     @Test
     void seedData_loads_all18Repos() {
-        assertThat(repoRepo.count()).isEqualTo(16);
+        assertThat(repoRepo.count()).isEqualTo(18);
     }
 
     @Test
@@ -49,7 +49,7 @@ class RepoRepositoryTest {
 
     @Test
     void findBySlug_returnsCorrectRepo() {
-        Optional<GitLabRepository> repo = repoRepo.findBySlug("partner-customer");
+        Optional<GitLabRepository> repo = repoRepo.findBySlug("ms-partner-customer");
 
         assertThat(repo).isPresent();
         assertThat(repo.get().getIcon()).isEqualTo("👤");
@@ -76,7 +76,7 @@ class RepoRepositoryTest {
 
     @Test
     void partnerTransaction_hasHighestOpenMrs() {
-        Optional<GitLabRepository> repo = repoRepo.findBySlug("partner-transaction");
+        Optional<GitLabRepository> repo = repoRepo.findBySlug("ms-partner-transaction");
         assertThat(repo).isPresent();
         assertThat(repo.get().getOpenMrs()).isEqualTo(6);
     }
@@ -85,9 +85,11 @@ class RepoRepositoryTest {
     void saveAndRetrieve_newRepo() {
         GitLabRepository newRepo = new GitLabRepository(
                 "ms-new-service",
+                "ms-new-service",
                 99999999L,
                 "🆕",
-                0);
+                0,
+                com.repocity.identity.domain.RepoStatus.ACTIVE);
         repoRepo.save(newRepo);
 
         Optional<GitLabRepository> found = repoRepo.findBySlug("ms-new-service");

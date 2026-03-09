@@ -96,14 +96,14 @@ class PollerIntegrationTest {
     @Test
     void singlePollCycle_persistsEventsForAllSeededRepos() {
         int repoCount = (int) repoRepository.count();
-        assertThat(repoCount).isEqualTo(16); // all 16 repos seeded
+        assertThat(repoCount).isEqualTo(18); // all 18 repos seeded
 
         pollerService.pollAll();
 
         List<PollEvent> allEvents = pollEventRepository.findAll();
 
-        // Expect at least 2 events per repo (1 COMMIT + 1 MR_OPENED) × 16 repos
-        // plus 1 PIPELINE per repo = 48 events minimum
+        // Expect at least 2 events per repo (1 COMMIT + 1 MR_OPENED) × 18 repos
+        // plus 1 PIPELINE per repo = 54 events minimum
         assertThat(allEvents.size()).isGreaterThanOrEqualTo(repoCount * 2);
     }
 
@@ -151,8 +151,8 @@ class PollerIntegrationTest {
     @Test
     void singlePollCycle_on401_savesNoEventsForThatRepo() {
         // Override commits stub to return 401 for ms-ginpay specifically
-        // (group segment is URL-encoded, use a wildcard so the test-group config also matches)
-        wireMock.stubFor(get(urlPathMatching("/api/v4/projects/[^/]*ms-ginpay/repository/commits.*"))
+        // Uses the numeric gitlabProjectId (14965852) because GitLabClient builds URLs with project IDs
+        wireMock.stubFor(get(urlPathMatching("/api/v4/projects/14965852/repository/commits.*"))
                 .atPriority(1)
                 .willReturn(aResponse().withStatus(401)));
 

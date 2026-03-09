@@ -2,13 +2,18 @@ package com.repocity.poller.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.repocity.citystate.event.PollCycleCompleted;
 import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
 import com.repocity.poller.repository.PollEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Parses raw GitLab JSON arrays and persists {@link PollEvent} records.
@@ -16,6 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>MR and pipeline events are <em>deduplicated</em> by {@code gitlab_iid} so the same
  * item is never re-inserted across poll cycles.  COMMIT events (identified by SHA, not
  * by a stable numeric id) are always inserted as-is.
+ *
+ * <p>After all per-repository dispatches for a poll cycle are complete,
+ * {@link PollerService} calls {@link #publishCycleCompleted(List)} to notify the
+ * {@code city-state} module via a {@link PollCycleCompleted} Spring application event.
+ * Only newly inserted events are included — deduplicated ones are never forwarded.
  */
 @Service
 public class EventDispatcher {
@@ -23,41 +33,63 @@ public class EventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(EventDispatcher.class);
     private static final int MAX_PAYLOAD = 4096;
 
-    private final PollEventRepository eventRepo;
-    private final ObjectMapper mapper;
+    private final PollEventRepository    eventRepo;
+    private final ObjectMapper           mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public EventDispatcher(PollEventRepository eventRepo, ObjectMapper mapper) {
-        this.eventRepo = eventRepo;
-        this.mapper    = mapper;
+    public EventDispatcher(PollEventRepository eventRepo,
+                           ObjectMapper mapper,
+                           ApplicationEventPublisher eventPublisher) {
+        this.eventRepo      = eventRepo;
+        this.mapper         = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
+    // ── Public dispatch methods — return only newly persisted events ───────────
+
     @Transactional
-    public void dispatchCommits(String repoSlug, String json) {
+    public List<PollEvent> dispatchCommits(String repoSlug, String json) {
         // Commits have no stable numeric id we can dedup on — always insert.
-        dispatch(repoSlug, json, EventType.COMMIT, "author_name", "id", false);
+        return dispatch(repoSlug, json, EventType.COMMIT, "author_name", "id", false);
     }
 
     @Transactional
-    public void dispatchMergeRequests(String repoSlug, String json, EventType type) {
+    public List<PollEvent> dispatchMergeRequests(String repoSlug, String json, EventType type) {
         // MRs carry a project-scoped iid — deduplicate so re-polls are safe.
-        dispatch(repoSlug, json, type, "author", "iid", true);
+        return dispatch(repoSlug, json, type, "author", "iid", true);
     }
 
     @Transactional
-    public void dispatchPipelines(String repoSlug, String json) {
+    public List<PollEvent> dispatchPipelines(String repoSlug, String json) {
         // Pipelines carry a numeric id — deduplicate.
-        dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true);
+        return dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true);
+    }
+
+    /**
+     * Called by {@link PollerService} once all per-repo dispatches for a cycle
+     * have completed.  Publishes a {@link PollCycleCompleted} application event
+     * so the {@code city-state} module can apply mutation rules.
+     *
+     * @param newEvents all newly persisted events collected across the cycle
+     */
+    public void publishCycleCompleted(List<PollEvent> newEvents) {
+        if (newEvents.isEmpty()) {
+            log.debug("Poll cycle produced no new events — skipping PollCycleCompleted");
+            return;
+        }
+        log.info("Publishing PollCycleCompleted with {} new event(s)", newEvents.size());
+        eventPublisher.publishEvent(new PollCycleCompleted(newEvents));
     }
 
     // ── Private ────────────────────────────────────────────────────
 
-    private void dispatch(String repoSlug, String json, EventType type,
-                          String authorField, String iidField, boolean dedup) {
+    private List<PollEvent> dispatch(String repoSlug, String json, EventType type,
+                                     String authorField, String iidField, boolean dedup) {
+        List<PollEvent> saved = new ArrayList<>();
         try {
             JsonNode array = mapper.readTree(json);
-            if (!array.isArray()) return;
+            if (!array.isArray()) return saved;
 
-            int saved = 0;
             int skipped = 0;
 
             for (JsonNode node : array) {
@@ -77,13 +109,12 @@ public class EventDispatcher {
                 PollEvent event = new PollEvent(type, repoSlug, author, payload);
                 event.setGitlabIid(iid);
                 event.setWebUrl(webUrl);
-                eventRepo.save(event);
-                saved++;
+                saved.add(eventRepo.save(event));
             }
 
-            if (saved > 0) {
+            if (!saved.isEmpty()) {
                 log.info("Dispatched {} new {} event(s) for {} ({} duplicate(s) skipped)",
-                         saved, type, repoSlug, skipped);
+                         saved.size(), type, repoSlug, skipped);
             } else if (skipped > 0) {
                 log.debug("All {} {} event(s) for {} already stored — skipped",
                           skipped, type, repoSlug);
@@ -91,6 +122,7 @@ public class EventDispatcher {
         } catch (Exception e) {
             log.error("Failed to dispatch {} events for {}: {}", type, repoSlug, e.getMessage());
         }
+        return saved;
     }
 
     private String extractAuthor(JsonNode node, String field) {

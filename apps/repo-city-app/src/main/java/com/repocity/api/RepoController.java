@@ -29,15 +29,18 @@ public class RepoController {
 
     /**
      * Returns a summary of every tracked repository, sorted by open MR count descending.
-     * Used by the city UI to render the "Open MRs" panel with live counts and GitLab links.
+     * Used by the city UI to render the "Open MRs" panel with live counts and GitLab links,
+     * and to populate the floating building labels (name, icon, status).
      *
      * <p>Example response item:
      * <pre>{@code
      * {
-     *   "slug": "partner-transaction",
-     *   "icon": "💸",
-     *   "openMrCount": 6,
-     *   "gitlabMrListUrl": "https://gitlab.com/dk-digital-bank/services/ms-partner-transaction/-/merge_requests"
+     *   "slug":           "ms-partner-transaction",
+     *   "name":           "ms-partner-transaction",
+     *   "icon":           "�",
+     *   "openMrCount":    6,
+     *   "status":         "ACTIVE",
+     *   "gitlabMrListUrl":"https://gitlab.com/kreasipositif/ms-partner-transaction/-/merge_requests"
      * }
      * }</pre>
      */
@@ -48,8 +51,10 @@ public class RepoController {
                     String mrListUrl = resolveMrListUrl(repo.getSlug());
                     return new RepoSummary(
                             repo.getSlug(),
+                            repo.getName(),
                             repo.getIcon(),
                             repo.getOpenMrs(),
+                            repo.getStatus(),
                             mrListUrl
                     );
                 })
