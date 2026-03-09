@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { WAYPOINTS, ROAD_GRAPH } from '../constants/waypoints.js';
+import { WAYPOINTS, ROAD_GRAPH, SLUG_TO_WP } from '../constants/waypoints.js';
 
 const PI = Math.PI;
 
@@ -83,8 +83,8 @@ export class DeveloperManager {
       return;
     }
 
-    // Find the dev by name, or fall back to a random non-leader non-working dev
-    let dev = actorName ? this.findByName(actorName) : null;
+    // Find the dev by gitlabUsername (exact), fall back to a random non-leader non-working dev
+    let dev = actorName ? this.findByUsername(actorName) : null;
     if (!dev || dev.role === 'leader' || dev._dispatched || dev._working) {
       const eligible = this._devs.filter(d => d.role !== 'leader' && !d._dispatched && !d._working);
       dev = eligible.length > 0
@@ -486,16 +486,21 @@ export class DeveloperManager {
   }
 
   /**
-   * Find the waypoint index nearest to a building's world position.
-   * Uses BuildingManager.getBuildingTop() so it always matches the actual
-   * rendered building — no hardcoded slug→index map needed.
+   * Find the entrance waypoint index for a building.
    *
-   * Only considers waypoints 0–46 (main road network; 47–52 are dead-end stubs).
+   * Priority:
+   *   1. SLUG_TO_WP — the prototype's authoritative entrance map (includes dead-end stubs 47–52)
+   *   2. Dynamic nearest-waypoint fallback (main road nodes 0–46 only) for slugs
+   *      added after the prototype was written.
    *
    * @param {string} slug
    * @returns {number|null}  waypoint index, or null if building unknown
    */
   _nearestWaypoint(slug) {
+    // 1. Prefer the known entrance map — handles dead-end stubs correctly
+    if (SLUG_TO_WP[slug] !== undefined) return SLUG_TO_WP[slug];
+
+    // 2. Dynamic fallback for any slug not in the static map
     if (!this._buildingMgr) return null;
     const top = this._buildingMgr.getBuildingTop(slug);
     if (!top) return null;
