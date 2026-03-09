@@ -14,10 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.web.socket.messaging.SessionConnectedEvent;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,6 +23,8 @@ import static org.mockito.Mockito.*;
  * Unit tests for {@link SessionConnectHandler}.
  *
  * <p>No Spring context is loaded — collaborators are mocked with Mockito.
+ * The handler now responds to an explicit client request ({@code /app/city/snapshot-request})
+ * rather than firing on the {@code SessionConnectedEvent}.
  */
 @ExtendWith(MockitoExtension.class)
 class SessionConnectHandlerTest {
@@ -41,13 +40,13 @@ class SessionConnectHandlerTest {
         handler = new SessionConnectHandler(messagingTemplate, cityStateService);
     }
 
-    // ── onApplicationEvent ────────────────────────────────────────────────────
+    // ── onSnapshotRequest ─────────────────────────────────────────────────────
 
     @Test
-    void onApplicationEvent_sendsSnapshotToCorrectTopic() {
+    void onSnapshotRequest_sendsSnapshotToCorrectTopic() {
         when(cityStateService.getCityState()).thenReturn(emptyState());
 
-        handler.onApplicationEvent(buildEvent("session-001"));
+        handler.onSnapshotRequest();
 
         verify(messagingTemplate).convertAndSend(
                 eq(SessionConnectHandler.TOPIC_SNAPSHOT),
@@ -56,11 +55,11 @@ class SessionConnectHandlerTest {
     }
 
     @Test
-    void onApplicationEvent_snapshotContainsDistrict() {
+    void onSnapshotRequest_snapshotContainsDistrict() {
         CityState state = stateWithOneDistrict("ms-transaction", "💸", "Transaction Service");
         when(cityStateService.getCityState()).thenReturn(state);
 
-        handler.onApplicationEvent(buildEvent("session-002"));
+        handler.onSnapshotRequest();
 
         verify(messagingTemplate).convertAndSend(
                 eq(SessionConnectHandler.TOPIC_SNAPSHOT),
@@ -76,11 +75,11 @@ class SessionConnectHandlerTest {
     }
 
     @Test
-    void onApplicationEvent_snapshotContainsWorker() {
+    void onSnapshotRequest_snapshotContainsWorker() {
         CityState state = stateWithOneWorker("Rizki Ekaputri", UserRole.ENGINEER, Gender.FEMALE);
         when(cityStateService.getCityState()).thenReturn(state);
 
-        handler.onApplicationEvent(buildEvent("session-003"));
+        handler.onSnapshotRequest();
 
         verify(messagingTemplate).convertAndSend(
                 eq(SessionConnectHandler.TOPIC_SNAPSHOT),
@@ -96,10 +95,10 @@ class SessionConnectHandlerTest {
     }
 
     @Test
-    void onApplicationEvent_emptyState_sendsEmptySnapshot() {
+    void onSnapshotRequest_emptyState_sendsEmptySnapshot() {
         when(cityStateService.getCityState()).thenReturn(emptyState());
 
-        handler.onApplicationEvent(buildEvent("session-004"));
+        handler.onSnapshotRequest();
 
         verify(messagingTemplate).convertAndSend(
                 eq(SessionConnectHandler.TOPIC_SNAPSHOT),
@@ -114,7 +113,7 @@ class SessionConnectHandlerTest {
     }
 
     @Test
-    void onApplicationEvent_statsReflectCityStateAggregates() {
+    void onSnapshotRequest_statsReflectCityStateAggregates() {
         CityState state = emptyState();
         // Simulate some recorded activity
         state.recordCommit();
@@ -124,7 +123,7 @@ class SessionConnectHandlerTest {
         state.putWorker(new WorkerState("Dev B", UserRole.LEADER, Gender.FEMALE));
         when(cityStateService.getCityState()).thenReturn(state);
 
-        handler.onApplicationEvent(buildEvent("session-005"));
+        handler.onSnapshotRequest();
 
         verify(messagingTemplate).convertAndSend(
                 eq(SessionConnectHandler.TOPIC_SNAPSHOT),
@@ -138,24 +137,15 @@ class SessionConnectHandlerTest {
     }
 
     @Test
-    void onApplicationEvent_callsCityStateServiceExactlyOnce() {
+    void onSnapshotRequest_callsCityStateServiceExactlyOnce() {
         when(cityStateService.getCityState()).thenReturn(emptyState());
 
-        handler.onApplicationEvent(buildEvent("session-006"));
+        handler.onSnapshotRequest();
 
         verify(cityStateService, times(1)).getCityState();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /** Builds a minimal {@link SessionConnectedEvent} with the given session ID. */
-    private static SessionConnectedEvent buildEvent(String sessionId) {
-        Message<byte[]> message = MessageBuilder
-                .withPayload(new byte[0])
-                .setHeader("simpSessionId", sessionId)
-                .build();
-        return new SessionConnectedEvent(new Object(), message);
-    }
 
     private static CityState emptyState() {
         return new CityState();
@@ -175,3 +165,4 @@ class SessionConnectHandlerTest {
         return state;
     }
 }
+

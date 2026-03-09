@@ -412,3 +412,189 @@ html, body, #root {
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-5px); }
 }
+
+/* ── Activity Feed ─────────────────────────────────────────────────────────
+   Terminal-style event log, top-right corner.
+   Shows each GitLab event as it arrives with a typewriter effect.
+   ─────────────────────────────────────────────────────────────────────── */
+
+.af-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 25;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-family: 'Courier New', 'Consolas', 'Lucida Console', monospace;
+  /* subtle glow to tie into the HUD palette */
+  filter: drop-shadow(0 0 12px rgba(80, 160, 255, 0.18));
+  animation: afFadeIn 0.18s ease;
+}
+
+@keyframes afFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ─── */
+.af-header {
+  background: rgba(16, 28, 44, 0.97);
+  border: 1px solid rgba(80, 160, 255, 0.30);
+  border-bottom: 1px solid rgba(80, 160, 255, 0.12);
+  border-radius: 7px 7px 0 0;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.af-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.af-dot-red    { background: #ff5f57; }
+.af-dot-yellow { background: #febc2e; }
+.af-dot-green  { background: #28c840; }
+
+.af-header-title {
+  margin-left: 7px;
+  font-size: 0.72rem;
+  color: rgba(138, 173, 204, 0.75);
+  letter-spacing: 0.05em;
+}
+
+/* ── Body ─── */
+.af-body {
+  background: rgba(5, 12, 20, 0.94);
+  border: 1px solid rgba(80, 160, 255, 0.22);
+  border-top: none;
+  border-radius: 0 0 7px 7px;
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Individual lines ─── */
+.af-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  transition: background 0.25s;
+  border-left: 2px solid transparent;
+  animation: afLineIn 0.15s ease;
+}
+
+@keyframes afLineIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Phase: walking → subtle left-border pulse */
+.af-line-walking {
+  border-left-color: rgba(138, 173, 204, 0.35);
+}
+
+/* Phase: complete → flash then fade out */
+.af-line-complete {
+  animation: afComplete 2.2s ease forwards;
+}
+
+@keyframes afComplete {
+  0%   { background: rgba(80, 160, 255, 0.08); }
+  15%  { background: rgba(80, 160, 255, 0.22); }
+  60%  { background: rgba(80, 160, 255, 0.06); }
+  100% { opacity: 0; }
+}
+
+/* ── Per-event-type accent colours ─── */
+.af-commit      { border-left-color: rgba(255, 221, 102, 0.55); color: #e8cc58; }
+.af-mr          { border-left-color: rgba(204, 136, 255, 0.55); color: #cc88ff; }
+.af-merge       { border-left-color: rgba(102, 255, 153, 0.55); color: #66ff99; }
+.af-pipeline    { border-left-color: rgba(102, 221, 255, 0.55); color: #66ddff; }
+.af-pipeline-fail { border-left-color: rgba(255, 80, 80, 0.65); color: #ff6666; }
+
+/* ── Sub-elements ─── */
+.af-ts {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: rgba(138, 173, 204, 0.45);
+  letter-spacing: 0.02em;
+}
+
+.af-repo-icon {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  filter: brightness(0.85);
+}
+
+.af-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Blinking block cursor */
+.af-cursor {
+  display: inline-block;
+  font-size: 0.85em;
+  margin-left: 1px;
+  animation: afBlink 0.8s step-end infinite;
+  opacity: 1;
+}
+/* Slow-pulse during walking phase to imply "waiting" */
+.af-cursor-walk {
+  animation: afBlink 1.4s step-end infinite;
+  opacity: 0.65;
+}
+
+@keyframes afBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Walking icon - subtle bounce */
+.af-walking {
+  display: inline-block;
+  font-size: 0.85em;
+  margin-left: 4px;
+  animation: afWalk 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes afWalk {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-2px); }
+}
+
+/* Done tick — glows in the line's accent colour */
+.af-done {
+  font-style: normal;
+  margin-left: 4px;
+  font-weight: bold;
+  filter: brightness(1.4);
+}
+
+/* Scanline overlay — subtle texture over the whole panel */
+.af-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  pointer-events: none;
+  border-radius: 7px;
+}

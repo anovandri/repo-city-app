@@ -16,8 +16,9 @@ import { LabelManager }    from '../scene/LabelManager.js';
  * Props:
  *   sceneRef   — ref filled with { buildingMgr, effectsMgr, developerMgr }
  *   onToast    — (message, type) => void
+ *   onActivity — (action, data) => void  (for ActivityFeed)
  */
-export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast }) {
+export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast, onActivity }) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
   const clockRef  = useRef(new THREE.Clock());
@@ -40,7 +41,7 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast }) 
       const buildingMgr  = new BuildingManager(sceneMgr.scene, apiRepos);
       const developerMgr = new DeveloperManager(sceneMgr.scene, apiWorkers);
       developerMgr.setBuildingManager(buildingMgr);
-      const effectsMgr   = new EffectsManager(sceneMgr.scene, buildingMgr, onToast, developerMgr);
+      const effectsMgr   = new EffectsManager(sceneMgr.scene, buildingMgr, onToast, developerMgr, onActivity);
       const labelMgr     = new LabelManager(sceneMgr.scene);
 
       // Expose imperative API to App

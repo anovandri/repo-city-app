@@ -88,15 +88,19 @@ class CityStateServiceIntegrationTest {
     // ── COMMIT event ───────────────────────────────────────────────────────────
 
     @Test
-    void commitEvent_incrementsBuildingFloors_andPublishesMutationEvent() {
+    void commitEvent_doesNotChangeBuildingFloors_andPublishesMutationEvent() {
         PollEvent commit = event(EventType.COMMIT, "ms-partner-web",
                 "@anovandri",
                 "{\"id\":\"sha-1\",\"author_name\":\"Aditya Novandri\",\"message\":\"feat: x\"}");
 
+        DistrictState districtBefore = cityStateService.getCityState().getDistricts().get("ms-partner-web");
+        int floorsBefore = districtBefore != null ? districtBefore.getBuildingFloors() : 0;
+
         eventPublisher.publishEvent(new PollCycleCompleted(List.of(commit)));
 
+        // Commits no longer grow buildings — only MR merges do.
         DistrictState district = cityStateService.getCityState().getDistricts().get("ms-partner-web");
-        assertThat(district.getBuildingFloors()).isGreaterThanOrEqualTo(1);
+        assertThat(district.getBuildingFloors()).isEqualTo(floorsBefore);
 
         assertThat(collector.received).hasSize(1);
         CityMutation mutation = collector.received.get(0).getMutations().get(0);

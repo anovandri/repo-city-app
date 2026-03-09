@@ -38,11 +38,13 @@ class DistrictStateTest {
     // ── commitArrived ──────────────────────────────────────────────────────────
 
     @Test
-    void commitArrived_incrementsBuildingFloors() {
+    void commitArrived_doesNotChangeBuildingFloors() {
+        int floorsBefore = district.getBuildingFloors();
         district.commitArrived("Aditya");
         district.commitArrived("Wira");
 
-        assertThat(district.getBuildingFloors()).isEqualTo(2);
+        // Commits no longer grow buildings — only MR merges do.
+        assertThat(district.getBuildingFloors()).isEqualTo(floorsBefore);
     }
 
     @Test

@@ -4,7 +4,8 @@ import { HUD }        from './components/HUD.jsx';
 import { MRPanel }    from './components/MRPanel.jsx';
 import { DevPanel }   from './components/DevPanel.jsx';
 import { SimPanel }   from './components/SimPanel.jsx';
-import { Toast }      from './components/Toast.jsx';
+import { Toast }        from './components/Toast.jsx';
+import { ActivityFeed } from './components/ActivityFeed.jsx';
 import { useWebSocket }  from './hooks/useWebSocket.js';
 import { useCityState }  from './hooks/useCityState.js';
 
@@ -17,8 +18,10 @@ import { useCityState }  from './hooks/useCityState.js';
  *  - useWebSocket pipes snapshot → applySnapshot and mutations → applyMutation + 3D effects
  */
 export default function App() {
-  const sceneRef  = useRef(null);  // { buildingMgr, effectsMgr, developerMgr }
-  const toastRef  = useRef(null);  // addToast function from Toast component
+  const sceneRef           = useRef(null);  // { buildingMgr, effectsMgr, developerMgr }
+  const toastRef           = useRef(null);  // addToast function from Toast component
+  const activityFeedRef    = useRef(null);  // { push, complete } from ActivityFeed
+  const snapshotApplied    = useRef(false); // true once the first snapshot has been applied
 
   const [showMR,  setShowMR]  = useState(false);
   const [showDev, setShowDev] = useState(false);
@@ -58,15 +61,9 @@ export default function App() {
 
   const { stats, mrMap, devActivity, applySnapshot, applyMutation } = useCityState(workers);
 
-  // Toast callback — called from EffectsManager inside the canvas
-  const handleToast = useCallback((message, type) => {
-    toastRef.current?.(message, type);
-  }, []);
-
-  // Handle snapshot — hydrate React state + building floors
-  const handleSnapshot = useCallback(snapshot => {
+  // Applies a snapshot to both React state and the 3D scene.
+  const _applySnapshotToScene = useCallback(snapshot => {
     applySnapshot(snapshot);
-    // Update building heights from snapshot
     if (sceneRef.current?.buildingMgr && snapshot.districts) {
       snapshot.districts.forEach(d => {
         if (d.buildingFloors) {
@@ -76,23 +73,52 @@ export default function App() {
     }
   }, [applySnapshot]);
 
-  // Handle mutation — update React state + trigger 3D effect
-  const handleMutation = useCallback(mutation => {
+  // Applies a single mutation to both React state and the 3D scene.
+  const _applyMutationToScene = useCallback(mutation => {
     applyMutation(mutation);
-    // Trigger 3D visual effect (no React re-render)
     sceneRef.current?.effectsMgr?.trigger(mutation);
-    // Update building height if floors changed
     if (mutation.newBuildingFloors && mutation.repoSlug) {
       sceneRef.current?.buildingMgr?.setFloors(mutation.repoSlug, mutation.newBuildingFloors);
     }
   }, [applyMutation]);
 
+  // Handle snapshot — always apply the first snapshot as the true baseline.
+  // Any subsequent snapshots (broadcast when another client connects) are
+  // ignored because we already have live incremental state.
+  const handleSnapshot = useCallback(snapshot => {
+    if (snapshotApplied.current) {
+      console.debug('[App] Ignoring mid-session snapshot (already have baseline)');
+      return;
+    }
+    snapshotApplied.current = true;
+    _applySnapshotToScene(snapshot);
+  }, [_applySnapshotToScene]);
+
+  // Handle mutation — apply immediately, always.
+  // Mutations may arrive before the snapshot (race condition on connect).
+  // That is fine — they increment from zero until the snapshot arrives and
+  // sets the correct baseline. Once the snapshot arrives it won't override
+  // accumulated mutations because snapshotApplied is checked above.
+  const handleMutation = useCallback(mutation => {
+    _applyMutationToScene(mutation);
+  }, [_applyMutationToScene]);
+
   useWebSocket({ onSnapshot: handleSnapshot, onMutation: handleMutation });
+
+  // Toast callback — called from EffectsManager inside the canvas
+  const handleToast = useCallback((message, type) => {
+    toastRef.current?.(message, type);
+  }, []);
+
+  // ActivityFeed callback — called from EffectsManager
+  const handleActivity = useCallback((action, data) => {
+    activityFeedRef.current?.[action]?.(data);
+  }, []);
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* Full-screen Three.js canvas */}
-      <CityCanvas sceneRef={sceneRef} onToast={handleToast} />
+      <CityCanvas sceneRef={sceneRef} onToast={handleToast} onActivity={handleActivity} />
 
       {/* HUD — top-left */}
       <HUD
@@ -107,6 +133,9 @@ export default function App() {
 
       {/* Simulation panel — toggle with Alt+S */}
       {showSim && <SimPanel onClose={() => setShowSim(false)} />}
+
+      {/* Activity Feed — terminal-style event log, top-right */}
+      <ActivityFeed feedRef={activityFeedRef} />
 
       {/* Toast notifications — bottom-center */}
       <Toast toastRef={toastRef} />

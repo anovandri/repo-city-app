@@ -118,12 +118,13 @@ class CityStateServiceTest {
     }
 
     @Test
-    void onPollCycleCompleted_commit_incrementsBuildingFloors() {
+    void onPollCycleCompleted_commit_doesNotChangeBuildingFloors() {
+        // Commits no longer grow buildings — only MR merges do.
         service.onPollCycleCompleted(new PollCycleCompleted(List.of(commitEvent())));
 
         DistrictState district = service.getCityState().getDistricts().get(REPO_SLUG);
-        assertThat(district.getBuildingFloors()).isEqualTo(1);
-        assertThat(m(service).getNewBuildingFloors()).isEqualTo(1);
+        assertThat(district.getBuildingFloors()).isEqualTo(0);
+        assertThat(m(service).getNewBuildingFloors()).isEqualTo(0);
     }
 
     @Test

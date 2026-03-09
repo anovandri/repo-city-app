@@ -56,12 +56,14 @@ export class EffectsManager {
    * @param {import('./BuildingManager').BuildingManager} buildingManager
    * @param {(msg: string, type: string) => void} onToast
    * @param {import('./DeveloperManager').DeveloperManager} [developerManager]
+   * @param {(action: string, data: any) => void} [onActivity]
    */
-  constructor(scene, buildingManager, onToast, developerManager) {
+  constructor(scene, buildingManager, onToast, developerManager, onActivity) {
     this._scene          = scene;
     this._buildingMgr    = buildingManager;
     this._onToast        = onToast;
     this._developerMgr   = developerManager ?? null;
+    this._onActivity     = onActivity ?? null;
     this._activeEffects  = [];
   }
 
@@ -100,6 +102,16 @@ export class EffectsManager {
     };
     const toastMsg = messages[hint] ?? `${icon} Activity on ${repoSlug}`;
 
+    // ── Activity Feed — Phase 1: push entry immediately ──────────────────
+    const feedId = (Date.now() * 1000 + Math.trunc(Math.random() * 1000));
+    this._onActivity?.('push', {
+      id: feedId,
+      actorDisplayName: actorLabel,
+      hint,
+      repoSlug,
+      repoIcon,
+    });
+
     // ── Phase 1: Show waiting icon above the building immediately ────────
     const waitDiv = document.createElement('div');
     waitDiv.className = 'event-indicator';
@@ -112,6 +124,8 @@ export class EffectsManager {
     // ── Phase 2: On arrival — remove waiting icon, fire beam + light ─────
     const fireBeam = () => {
       this._scene.remove(waitLabel);
+      // Activity Feed — Phase 2: mark entry as complete (beam fired)
+      this._onActivity?.('complete', feedId);
       this._spawnBeamEffect(mutation, top, color, icon, dur, toastMsg);
     };
 

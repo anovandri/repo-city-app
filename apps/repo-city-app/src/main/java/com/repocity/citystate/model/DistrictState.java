@@ -69,7 +69,6 @@ public class DistrictState {
     // ── Mutation helpers (called by CityStateService) ──────────────────────────
 
     public void commitArrived(String workerName) {
-        buildingFloors++;
         activeWorkerNames.add(workerName);
         lastActivityAt = Instant.now();
     }

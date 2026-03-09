@@ -57,13 +57,12 @@ export function useCityState(workers = []) {
 
     // MR map — keyed by repoSlug, sourced from districts
     if (snapshot.districts?.length) {
-      setMrMap(prev => {
-        const next = { ...prev };
-        snapshot.districts.forEach(d => {
-          if (d.repoSlug) next[d.repoSlug] = d.openMrCount ?? 0;
-        });
-        return next;
+      const next = { ...mrMapRef.current };
+      snapshot.districts.forEach(d => {
+        if (d.repoSlug) next[d.repoSlug] = d.openMrCount ?? 0;
       });
+      mrMapRef.current = next;   // keep ref in sync with snapshot
+      setMrMap(next);
     }
   }, []);
 
@@ -74,34 +73,26 @@ export function useCityState(workers = []) {
   const applyMutation = useCallback(mutation => {
     const { type, repoSlug, actorDisplayName, newOpenMrCount } = mutation;
 
-    // Update stats
+    // ── MR map ──────────────────────────────────────────────────────────────
+    // Update the per-repo MR count first so we can derive the new total.
+    let newTotal = undefined;
+    if (newOpenMrCount !== undefined && repoSlug) {
+      const nextMap = { ...mrMapRef.current, [repoSlug]: newOpenMrCount };
+      mrMapRef.current = nextMap;
+      setMrMap(nextMap);
+      newTotal = Object.values(nextMap).reduce((a, v) => a + v, 0);
+    }
+
+    // ── Stats — single setStats call ────────────────────────────────────────
     setStats(prev => {
       const next = { ...prev };
-      if (type === 'COMMIT') {
-        next.totalCommits = prev.totalCommits + 1;
-      }
-      if (newOpenMrCount !== undefined && repoSlug) {
-        // Recalculate total open MRs from map after this update
-        // We do it in the mrMap update below
-      }
+      if (type === 'COMMIT') next.totalCommits = prev.totalCommits + 1;
+      if (newTotal !== undefined) next.openMrCount = newTotal;
       return next;
     });
 
-    // Update per-repo MR count
-    if (newOpenMrCount !== undefined && repoSlug) {
-      setMrMap(prev => {
-        const next = { ...prev, [repoSlug]: newOpenMrCount };
-        // Recalculate total open MRs and push into stats
-        const total = Object.values(next).reduce((a, v) => a + v, 0);
-        setStats(s => ({ ...s, openMrCount: total }));
-        return next;
-      });
-    }
-
-    // Update dev activity
+    // ── Dev activity ────────────────────────────────────────────────────────
     if (actorDisplayName) {
-      // actorDisplayName from the backend matches displayName from /api/workers,
-      // which is the key we use in devActivity.
       const key = actorDisplayName;
       setDevActivity(prev => {
         const old = prev[key] ?? { commits: 0, mrsOpened: 0, mrsMerged: 0, pipelines: 0, byRepo: {} };

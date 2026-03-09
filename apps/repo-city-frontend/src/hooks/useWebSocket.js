@@ -33,7 +33,10 @@ export function useWebSocket({ onSnapshot, onMutation }) {
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
       onConnect: () => {
-        // Subscribe to snapshot topic
+        // Subscribe to snapshot first, then request it.
+        // The server broadcasts to /topic/city/snapshot whenever a client
+        // sends to /app/city/snapshot-request, ensuring the subscription
+        // is active before the payload arrives.
         client.subscribe('/topic/city/snapshot', frame => {
           try {
             const msg = JSON.parse(frame.body);
@@ -52,6 +55,9 @@ export function useWebSocket({ onSnapshot, onMutation }) {
             console.error('[WS] Bad mutation payload', e);
           }
         });
+
+        // Request the snapshot now that the subscription is active.
+        client.publish({ destination: '/app/city/snapshot-request', body: '{}' });
       },
       onStompError: frame => {
         console.error('[WS] STOMP error', frame);

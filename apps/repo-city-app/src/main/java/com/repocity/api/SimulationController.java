@@ -1,5 +1,6 @@
 package com.repocity.api;
 
+import com.repocity.citystate.CityStateService;
 import com.repocity.citystate.event.CityMutation;
 import com.repocity.citystate.event.CityMutation.AnimationHint;
 import com.repocity.citystate.event.CityMutationEvent;
@@ -56,14 +57,17 @@ public class SimulationController {
     private final ApplicationEventPublisher eventPublisher;
     private final RepoRepository            repoRepository;
     private final GitlabUserRepository      gitlabUserRepository;
+    private final CityStateService          cityStateService;
     private final Random                    rng = new Random();
 
     public SimulationController(ApplicationEventPublisher eventPublisher,
                                 RepoRepository repoRepository,
-                                GitlabUserRepository gitlabUserRepository) {
+                                GitlabUserRepository gitlabUserRepository,
+                                CityStateService cityStateService) {
         this.eventPublisher       = eventPublisher;
         this.repoRepository       = repoRepository;
         this.gitlabUserRepository = gitlabUserRepository;
+        this.cityStateService     = cityStateService;
     }
 
     /**
@@ -119,6 +123,20 @@ public class SimulationController {
 
         EventType eventType = EVENT_TYPE_MAP.getOrDefault(req.eventType().toUpperCase(), EventType.COMMIT);
 
+        // Read current district state so we can produce a realistic delta.
+        // MR_OPENED adds 1 open MR; MR_MERGED subtracts 1; others keep the current count.
+        var districtState = cityStateService.getCityState().getDistricts().get(req.repoSlug());
+        int currentOpenMrs   = districtState != null ? districtState.getOpenMrCount()   : 0;
+        int currentFloors    = districtState != null ? districtState.getBuildingFloors() : 1;
+        int newOpenMrCount = switch (req.eventType().toUpperCase()) {
+            case "MR_OPENED" -> currentOpenMrs + 1;
+            case "MR_MERGED" -> Math.max(0, currentOpenMrs - 1);
+            default          -> currentOpenMrs;
+        };
+        int newBuildingFloors = (req.eventType().equalsIgnoreCase("MR_MERGED"))
+                ? Math.min(currentFloors + 1, 12)
+                : currentFloors;
+
         CityMutation mutation = CityMutation.builder()
                 .eventType(eventType)
                 .repoSlug(req.repoSlug())
@@ -128,8 +146,8 @@ public class SimulationController {
                 .actorRole(actorRole)
                 .actorGender(actorGender)
                 .animationHint(hint)
-                .newBuildingFloors(rng.nextInt(5) + 1)
-                .newOpenMrCount(rng.nextInt(8))
+                .newBuildingFloors(newBuildingFloors)
+                .newOpenMrCount(newOpenMrCount)
                 .build();
 
         eventPublisher.publishEvent(new CityMutationEvent(List.of(mutation)));
@@ -188,6 +206,16 @@ public class SimulationController {
             AnimationHint hint      = HINT_MAP.get(eventType);
             EventType     evType    = EVENT_TYPE_MAP.get(eventType);
 
+            var districtState = cityStateService.getCityState().getDistricts().get(slug);
+            int currentOpenMrs  = districtState != null ? districtState.getOpenMrCount()   : 0;
+            int currentFloors   = districtState != null ? districtState.getBuildingFloors() : 1;
+            int newOpenMrCount = switch (eventType) {
+                case "MR_OPENED" -> currentOpenMrs + 1;
+                case "MR_MERGED" -> Math.max(0, currentOpenMrs - 1);
+                default          -> currentOpenMrs;
+            };
+            int newFloors = eventType.equals("MR_MERGED") ? Math.min(currentFloors + 1, 12) : currentFloors;
+
             CityMutation mutation = CityMutation.builder()
                     .eventType(evType)
                     .repoSlug(slug)
@@ -197,8 +225,8 @@ public class SimulationController {
                     .actorRole(actorRole)
                     .actorGender(actorGender)
                     .animationHint(hint)
-                    .newBuildingFloors(rng.nextInt(5) + 1)
-                    .newOpenMrCount(rng.nextInt(8))
+                    .newBuildingFloors(newFloors)
+                    .newOpenMrCount(newOpenMrCount)
                     .build();
 
             eventPublisher.publishEvent(new CityMutationEvent(List.of(mutation)));
