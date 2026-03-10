@@ -64,6 +64,23 @@ export function useCityState(workers = []) {
       mrMapRef.current = next;   // keep ref in sync with snapshot
       setMrMap(next);
     }
+
+    // Developer activity — keyed by displayName, sourced from workers
+    if (snapshot.workers?.length) {
+      const nextDevActivity = {};
+      snapshot.workers.forEach(w => {
+        const activity = w.activity ?? { commits: 0, mrsOpened: 0, mrsMerged: 0, pipelines: 0, byRepo: {} };
+        nextDevActivity[w.displayName] = {
+          commits:   activity.commits   ?? 0,
+          mrsOpened: activity.mrsOpened ?? 0,
+          mrsMerged: activity.mrsMerged ?? 0,
+          pipelines: activity.pipelines ?? 0,
+          byRepo:    activity.byRepo    ?? {},
+        };
+      });
+      devActivityRef.current = nextDevActivity;   // keep ref in sync with snapshot
+      setDevActivity(nextDevActivity);
+    }
   }, []);
 
   /**

@@ -27,6 +27,9 @@ public class WorkerState {
     /** Last time an event was attributed to this worker. */
     private Instant lastSeenAt;
 
+    /** Activity counters for this developer. */
+    private final DeveloperActivity activity = new DeveloperActivity();
+
     public WorkerState(String displayName, UserRole role, Gender gender) {
         this.displayName = displayName;
         this.role        = role;

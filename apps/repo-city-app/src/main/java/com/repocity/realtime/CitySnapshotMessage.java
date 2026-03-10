@@ -1,6 +1,7 @@
 package com.repocity.realtime;
 
 import com.repocity.citystate.model.CityState;
+import com.repocity.citystate.model.DeveloperActivity;
 import com.repocity.citystate.model.DistrictState;
 import com.repocity.citystate.model.WorkerState;
 import com.repocity.identity.domain.Gender;
@@ -9,7 +10,9 @@ import com.repocity.identity.domain.UserRole;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Full city state snapshot broadcast to {@code /topic/city/snapshot} when a new
@@ -64,12 +67,46 @@ public record CitySnapshotMessage(
      * @param role                 developer role
      * @param gender               gender (drives avatar asset selection)
      * @param currentDistrictSlug  repo slug of the district the worker is currently in; may be null
+     * @param activity             activity counters for this developer
      */
     public record WorkerSummary(
             String   displayName,
             UserRole role,
             Gender   gender,
-            String   currentDistrictSlug
+            String   currentDistrictSlug,
+            ActivitySummary activity
+    ) {}
+
+    /**
+     * Developer activity summary.
+     *
+     * @param commits     total commits by this developer
+     * @param mrsOpened   total MRs opened by this developer
+     * @param mrsMerged   total MRs merged by this developer
+     * @param pipelines   total pipelines by this developer
+     * @param byRepo      per-repository breakdown
+     */
+    public record ActivitySummary(
+            int commits,
+            int mrsOpened,
+            int mrsMerged,
+            int pipelines,
+            Map<String, RepoActivitySummary> byRepo
+    ) {}
+
+    /**
+     * Per-repository activity summary.
+     *
+     * @param commits     commits in this repository
+     * @param mrsOpened   MRs opened in this repository
+     * @param mrsMerged   MRs merged in this repository
+     * @param pipelines   pipelines in this repository
+     */
+    public record RepoActivitySummary(
+            int commits,
+            int mrsOpened,
+            int mrsMerged,
+            int pipelines
     ) {}
 
     /**
@@ -127,11 +164,33 @@ public record CitySnapshotMessage(
     }
 
     private static WorkerSummary toWorkerSummary(WorkerState w) {
+        DeveloperActivity activity = w.getActivity();
+        
+        Map<String, RepoActivitySummary> byRepoMap = activity.getByRepo().entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> new RepoActivitySummary(
+                                e.getValue().getCommits(),
+                                e.getValue().getMrsOpened(),
+                                e.getValue().getMrsMerged(),
+                                e.getValue().getPipelines()
+                        )
+                ));
+
+        ActivitySummary activitySummary = new ActivitySummary(
+                activity.getCommits(),
+                activity.getMrsOpened(),
+                activity.getMrsMerged(),
+                activity.getPipelines(),
+                byRepoMap
+        );
+
         return new WorkerSummary(
                 w.getDisplayName(),
                 w.getRole(),
                 w.getGender(),
-                w.getCurrentDistrictSlug()
+                w.getCurrentDistrictSlug(),
+                activitySummary
         );
     }
 }

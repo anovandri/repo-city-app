@@ -239,6 +239,13 @@ public class CityStateService {
                 district.commitArrived(actorDisplayName != null ? actorDisplayName : "unknown");
                 cityState.recordCommit();
                 cityState.pushRecentEvent(actorDisplayName + " committed to " + event.getRepoSlug());
+                // Track developer activity
+                if (actorDisplayName != null) {
+                    WorkerState worker = cityState.getWorkers().get(actorDisplayName);
+                    if (worker != null) {
+                        worker.getActivity().incrementCommits(event.getRepoSlug());
+                    }
+                }
                 b.animationHint(AnimationHint.COMMIT_BEAM)
                  .newBuildingFloors(district.getBuildingFloors())
                  .newOpenMrCount(district.getOpenMrCount());
@@ -246,6 +253,13 @@ public class CityStateService {
             case MR_OPENED -> {
                 district.mrOpened(actorDisplayName != null ? actorDisplayName : "unknown");
                 cityState.pushRecentEvent(actorDisplayName + " opened an MR in " + event.getRepoSlug());
+                // Track developer activity
+                if (actorDisplayName != null) {
+                    WorkerState worker = cityState.getWorkers().get(actorDisplayName);
+                    if (worker != null) {
+                        worker.getActivity().incrementMrsOpened(event.getRepoSlug());
+                    }
+                }
                 b.animationHint(AnimationHint.MR_OPENED_BEAM)
                  .newBuildingFloors(district.getBuildingFloors())
                  .newOpenMrCount(district.getOpenMrCount());
@@ -254,6 +268,13 @@ public class CityStateService {
                 district.mrMerged(actorDisplayName != null ? actorDisplayName : "unknown");
                 cityState.recordMerge();
                 cityState.pushRecentEvent(actorDisplayName + " merged an MR in " + event.getRepoSlug());
+                // Track developer activity
+                if (actorDisplayName != null) {
+                    WorkerState worker = cityState.getWorkers().get(actorDisplayName);
+                    if (worker != null) {
+                        worker.getActivity().incrementMrsMerged(event.getRepoSlug());
+                    }
+                }
                 b.animationHint(AnimationHint.MERGE_SUCCESS)
                  .newBuildingFloors(district.getBuildingFloors())
                  .newOpenMrCount(district.getOpenMrCount());
@@ -268,6 +289,13 @@ public class CityStateService {
                     default      -> AnimationHint.PIPELINE_RUNNING;
                 };
                 cityState.pushRecentEvent("Pipeline " + status.name().toLowerCase() + " in " + event.getRepoSlug());
+                // Track developer activity for completed pipelines
+                if ((status == PipelineStatus.SUCCESS || status == PipelineStatus.FAILED) && actorDisplayName != null) {
+                    WorkerState worker = cityState.getWorkers().get(actorDisplayName);
+                    if (worker != null) {
+                        worker.getActivity().incrementPipelines(event.getRepoSlug());
+                    }
+                }
                 b.animationHint(hint)
                  .pipelineStatus(status.name().toLowerCase())
                  .newBuildingFloors(district.getBuildingFloors())
