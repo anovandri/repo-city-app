@@ -89,60 +89,8 @@ public class CityStateService {
      */
     @EventListener(ApplicationReadyEvent.class)
     void bootstrap() {
-        // Try to restore the most recent persisted snapshot first. If that fails
-        // fall back to seeding from the identity module (seeded repos/users).
-        // Single-element array used as a mutable boolean that can be captured by the lambdas below.
-        boolean[] restoredFromSnapshot = {false};
-
-        snapshotRepo.findTopByOrderByCreatedAtDesc().ifPresentOrElse(snap -> {
-            try {
-                CityState persisted = objectMapper.readValue(snap.getPayload(), CityState.class);
-                synchronized (cityState) {
-                    // Replace in-memory maps with values from the persisted snapshot
-                    cityState.getDistricts().clear();
-                    persisted.getDistricts().values().forEach(cityState::putDistrict);
-
-                    cityState.getWorkers().clear();
-                    persisted.getWorkers().values().forEach(cityState::putWorker);
-
-                    // Restore aggregate counters via the package-private helper —
-                    // no reflection needed since CityStateService is in the same package.
-                    cityState.restoreAggregates(
-                            persisted.getTotalCommits(),
-                            persisted.getTotalMrsMerged(),
-                            persisted.getLastUpdatedAt());
-                }
-
-                restoredFromSnapshot[0] = true;
-                log.info("City state restored from snapshot: {} districts, {} workers, {} total commits, {} total merges",
-                        cityState.getDistricts().size(), cityState.getWorkers().size(),
-                        cityState.getTotalCommits(), cityState.getTotalMrsMerged());
-            } catch (Exception e) {
-                log.warn("Failed to restore city snapshot: {} — falling back to seeded identity data", e.getMessage());
-            }
-        }, () -> {
-            // No snapshot present; fall through to seeding below.
-        });
-
-        if (!restoredFromSnapshot[0]) {
-            // No snapshot available (or restore failed): seed districts and workers fresh from DB.
-            List<GitLabRepository> repos = repoRepo.findAll();
-            for (GitLabRepository repo : repos) {
-                cityState.putDistrict(new DistrictState(
-                        repo.getSlug(),
-                        repo.getName(),
-                        repo.getIcon(),
-                        repo.getStatus(),
-                        repo.getOpenMrs()));
-            }
-
-            List<GitlabUser> users = userRepo.findAll();
-            for (GitlabUser user : users) {
-                cityState.putWorker(new WorkerState(
-                        user.getDisplayName(),
-                        user.getRole(),
-                        user.getGender()));
-            }
+        if (!tryRestoreFromSnapshot()) {
+            seedFromDb();
         }
 
         // Always overwrite per-district open MR counts from the DB after bootstrap,
@@ -155,6 +103,62 @@ public class CityStateService {
 
         log.info("City state bootstrapped: {} districts, {} workers, {} total commits, {} total merges, {} active developers, {} open MR",
                  cityState.getDistricts().size(), cityState.getWorkers().size(), cityState.getTotalCommits(), cityState.getTotalMrsMerged(), cityState.getActiveDeveloperCount(), cityState.getDistricts().values().stream().mapToInt(DistrictState::getOpenMrCount).sum());
+    }
+
+    /**
+     * Attempts to restore the city state from the most recent persisted snapshot.
+     *
+     * @return {@code true} if a snapshot was found and successfully deserialized;
+     *         {@code false} if no snapshot exists or deserialization failed (caller
+     *         should fall back to {@link #seedFromDb()}).
+     */
+    private boolean tryRestoreFromSnapshot() {
+        Optional<CitySnapshot> latest = snapshotRepo.findTopByOrderByCreatedAtDesc();
+        if (latest.isEmpty()) return false;
+
+        try {
+            CityState persisted = objectMapper.readValue(latest.get().getPayload(), CityState.class);
+            synchronized (cityState) {
+                cityState.getDistricts().clear();
+                persisted.getDistricts().values().forEach(cityState::putDistrict);
+
+                cityState.getWorkers().clear();
+                persisted.getWorkers().values().forEach(cityState::putWorker);
+
+                cityState.restoreAggregates(
+                        persisted.getTotalCommits(),
+                        persisted.getTotalMrsMerged(),
+                        persisted.getLastUpdatedAt());
+            }
+            log.info("City state restored from snapshot: {} districts, {} workers, {} total commits, {} total merges",
+                    cityState.getDistricts().size(), cityState.getWorkers().size(),
+                    cityState.getTotalCommits(), cityState.getTotalMrsMerged());
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to restore city snapshot: {} — falling back to seeded identity data", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Seeds the city state from the identity module (repositories + developers).
+     * Called when no usable snapshot is available.
+     */
+    private void seedFromDb() {
+        for (GitLabRepository repo : repoRepo.findAll()) {
+            cityState.putDistrict(new DistrictState(
+                    repo.getSlug(),
+                    repo.getName(),
+                    repo.getIcon(),
+                    repo.getStatus(),
+                    repo.getOpenMrs()));
+        }
+        for (GitlabUser user : userRepo.findAll()) {
+            cityState.putWorker(new WorkerState(
+                    user.getDisplayName(),
+                    user.getRole(),
+                    user.getGender()));
+        }
     }
 
     // ── Event listener ─────────────────────────────────────────────────────────
