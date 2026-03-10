@@ -89,28 +89,72 @@ public class CityStateService {
      */
     @EventListener(ApplicationReadyEvent.class)
     void bootstrap() {
-        // Seed one DistrictState per repository
-        List<GitLabRepository> repos = repoRepo.findAll();
-        for (GitLabRepository repo : repos) {
-            cityState.putDistrict(new DistrictState(
-                    repo.getSlug(),
-                    repo.getName(),
-                    repo.getIcon(),
-                    repo.getStatus(),
-                    repo.getOpenMrs()));
+        // Try to restore the most recent persisted snapshot first. If that fails
+        // fall back to seeding from the identity module (seeded repos/users).
+        // Single-element array used as a mutable boolean that can be captured by the lambdas below.
+        boolean[] restoredFromSnapshot = {false};
+
+        snapshotRepo.findTopByOrderByCreatedAtDesc().ifPresentOrElse(snap -> {
+            try {
+                CityState persisted = objectMapper.readValue(snap.getPayload(), CityState.class);
+                synchronized (cityState) {
+                    // Replace in-memory maps with values from the persisted snapshot
+                    cityState.getDistricts().clear();
+                    persisted.getDistricts().values().forEach(cityState::putDistrict);
+
+                    cityState.getWorkers().clear();
+                    persisted.getWorkers().values().forEach(cityState::putWorker);
+
+                    // Restore aggregate counters via the package-private helper —
+                    // no reflection needed since CityStateService is in the same package.
+                    cityState.restoreAggregates(
+                            persisted.getTotalCommits(),
+                            persisted.getTotalMrsMerged(),
+                            persisted.getLastUpdatedAt());
+                }
+
+                restoredFromSnapshot[0] = true;
+                log.info("City state restored from snapshot: {} districts, {} workers, {} total commits, {} total merges",
+                        cityState.getDistricts().size(), cityState.getWorkers().size(),
+                        cityState.getTotalCommits(), cityState.getTotalMrsMerged());
+            } catch (Exception e) {
+                log.warn("Failed to restore city snapshot: {} — falling back to seeded identity data", e.getMessage());
+            }
+        }, () -> {
+            // No snapshot present; fall through to seeding below.
+        });
+
+        if (!restoredFromSnapshot[0]) {
+            // No snapshot available (or restore failed): seed districts and workers fresh from DB.
+            List<GitLabRepository> repos = repoRepo.findAll();
+            for (GitLabRepository repo : repos) {
+                cityState.putDistrict(new DistrictState(
+                        repo.getSlug(),
+                        repo.getName(),
+                        repo.getIcon(),
+                        repo.getStatus(),
+                        repo.getOpenMrs()));
+            }
+
+            List<GitlabUser> users = userRepo.findAll();
+            for (GitlabUser user : users) {
+                cityState.putWorker(new WorkerState(
+                        user.getDisplayName(),
+                        user.getRole(),
+                        user.getGender()));
+            }
         }
 
-        // Seed one WorkerState per developer
-        List<GitlabUser> users = userRepo.findAll();
-        for (GitlabUser user : users) {
-            cityState.putWorker(new WorkerState(
-                    user.getDisplayName(),
-                    user.getRole(),
-                    user.getGender()));
+        // Always overwrite per-district open MR counts from the DB after bootstrap,
+        // regardless of whether we restored from a snapshot or seeded fresh.
+        // openMrCount is @JsonIgnore in DistrictState so snapshots never carry stale
+        // values — this call is the single authoritative source for open MR counts.
+        synchronized (cityState) {
+            refreshOpenMrCountsFromDb();
         }
 
-        log.info("CityState bootstrapped: {} districts, {} workers",
-                 repos.size(), users.size());
+        log.info("City state bootstrapped: {} districts, {} workers, {} total commits, {} total merges, {} active developers, {} open MR",
+                 cityState.getDistricts().size(), cityState.getWorkers().size(), cityState.getTotalCommits(), cityState.getTotalMrsMerged(), cityState.getActiveDeveloperCount(), cityState.getDistricts().values().stream().mapToInt(DistrictState::getOpenMrCount).sum());
     }
 
     // ── Event listener ─────────────────────────────────────────────────────────
@@ -135,6 +179,11 @@ public class CityStateService {
                     mutations.add(mutation);
                 }
             }
+
+            // Re-sync openMrCount for every district from the DB after mutations.
+            // The incremental MR_OPENED / MR_MERGED deltas can drift because historical
+            // events are replayed on each poll; the DB column is always authoritative.
+            refreshOpenMrCountsFromDb();
         }
 
         if (!mutations.isEmpty()) {
@@ -254,6 +303,27 @@ public class CityStateService {
     }
 
     // ── Snapshot persistence ───────────────────────────────────────────────────
+
+    /**
+     * Re-reads {@code open_mrs} from {@link GitLabRepository} rows and pushes the
+     * values into the matching in-memory {@link DistrictState} entries.
+     *
+     * <p>Must be called while holding the lock on {@code cityState}. Incremental
+     * MR_OPENED / MR_MERGED event deltas can drift (especially when historical
+     * events are replayed), so the DB column is treated as the single source of
+     * truth for the open-MR count.
+     */
+    private void refreshOpenMrCountsFromDb() {
+        List<GitLabRepository> repos = repoRepo.findAll();
+        for (GitLabRepository repo : repos) {
+            DistrictState district = cityState.getDistricts().get(repo.getSlug());
+            if (district != null) {
+                district.setOpenMrCount(repo.getOpenMrs());
+            }
+        }
+        log.debug("Open MR counts refreshed from DB: {} total open MRs",
+                cityState.getDistricts().values().stream().mapToInt(DistrictState::getOpenMrCount).sum());
+    }
 
     /**
      * Writes a JSON snapshot of the current city state to the database every 5 minutes.

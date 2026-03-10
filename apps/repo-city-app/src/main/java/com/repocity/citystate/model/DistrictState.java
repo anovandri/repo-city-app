@@ -1,5 +1,6 @@
 package com.repocity.citystate.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.repocity.identity.domain.RepoStatus;
 import lombok.Getter;
 
@@ -41,7 +42,13 @@ public class DistrictState {
     /**
      * Count of currently open merge requests.
      * Incremented on MR_OPENED, decremented (floor 0) on MR_MERGED.
+     *
+     * <p>Excluded from snapshot serialization ({@code @JsonIgnore}) because the DB
+     * column {@code gitlab_repositories.open_mrs} is the single source of truth.
+     * The value is always re-synced from the DB after restore and after each poll
+     * cycle via {@link com.repocity.citystate.CityStateService#refreshOpenMrCountsFromDb()}.
      */
+    @JsonIgnore
     private int openMrCount;
 
     /** Current CI pipeline status. */
@@ -89,6 +96,16 @@ public class DistrictState {
     public void pipelineUpdated(PipelineStatus status) {
         this.pipelineStatus = status;
         this.lastActivityAt = Instant.now();
+    }
+
+    /**
+     * Overrides the open MR count with the authoritative value from
+     * {@link com.repocity.identity.domain.GitLabRepository#getOpenMrs()}.
+     * Called after each poll cycle to keep this counter in sync with the DB
+     * instead of relying solely on incremental MR_OPENED/MR_MERGED deltas.
+     */
+    public void setOpenMrCount(int openMrCount) {
+        this.openMrCount = Math.max(0, openMrCount);
     }
 
     // ── Custom getter: defensive copy of the mutable set ──────────────────────

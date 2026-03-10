@@ -45,6 +45,7 @@ public class SessionConnectHandler {
     @MessageMapping("/city/snapshot-request")
     public void onSnapshotRequest() {
         CityState           state    = cityStateService.getCityState();
+        log.debug("City state open MR {}", state.getDistricts().values().stream().mapToInt(d -> d.getOpenMrCount()).sum());
         CitySnapshotMessage snapshot = CitySnapshotMessage.from(state);
 
         messagingTemplate.convertAndSend(TOPIC_SNAPSHOT, snapshot);

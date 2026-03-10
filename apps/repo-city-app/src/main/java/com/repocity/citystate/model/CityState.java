@@ -65,6 +65,23 @@ public class CityState {
         }
     }
 
+    /**
+     * Overwrites the aggregate counters with values from a previously persisted snapshot.
+     *
+     * <p>Intentionally named (not a generic setter) to make its purpose clear.
+     * Called exclusively by {@link com.repocity.citystate.CityStateService} during
+     * bootstrap to restore persisted totals without reflection.
+     *
+     * @param totalCommits   persisted total-commits counter
+     * @param totalMrsMerged persisted total-merges counter
+     * @param lastUpdatedAt  persisted last-updated timestamp
+     */
+    public void restoreAggregates(int totalCommits, int totalMrsMerged, Instant lastUpdatedAt) {
+        this.totalCommits    = totalCommits;
+        this.totalMrsMerged  = totalMrsMerged;
+        this.lastUpdatedAt   = lastUpdatedAt != null ? lastUpdatedAt : Instant.EPOCH;
+    }
+
     // ── Read API ───────────────────────────────────────────────────────────────
 
     public Map<String, DistrictState> getDistricts() { return districts; }

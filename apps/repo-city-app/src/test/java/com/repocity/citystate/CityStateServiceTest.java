@@ -145,11 +145,14 @@ class CityStateServiceTest {
     // ── MR_OPENED event ───────────────────────────────────────────────────────
 
     @Test
-    void onPollCycleCompleted_mrOpened_incrementsOpenMrCount() {
+    void onPollCycleCompleted_mrOpened_openMrCountReflectsDb() {
+        // After a poll cycle the openMrCount is always re-synced from the DB
+        // (gitlab_repositories.open_mrs), not accumulated as event deltas.
+        // The mock returns openMrs=2, so the post-cycle value stays at 2.
         service.onPollCycleCompleted(new PollCycleCompleted(List.of(mrOpenedEvent())));
 
         DistrictState district = service.getCityState().getDistricts().get(REPO_SLUG);
-        assertThat(district.getOpenMrCount()).isEqualTo(3); // seeded with 2
+        assertThat(district.getOpenMrCount()).isEqualTo(2); // DB-authoritative: repoRepo mock returns openMrs=2
     }
 
     @Test
@@ -166,7 +169,8 @@ class CityStateServiceTest {
         service.onPollCycleCompleted(new PollCycleCompleted(List.of(mrMergedEvent())));
 
         DistrictState district = service.getCityState().getDistricts().get(REPO_SLUG);
-        assertThat(district.getOpenMrCount()).isEqualTo(1);   // 2 − 1
+        // openMrCount is re-synced from DB after the cycle — mock returns openMrs=2
+        assertThat(district.getOpenMrCount()).isEqualTo(2); // DB-authoritative: repoRepo mock returns openMrs=2
         assertThat(district.getBuildingFloors()).isEqualTo(3); // 0 + 3
     }
 

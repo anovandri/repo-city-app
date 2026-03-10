@@ -134,7 +134,9 @@ class CityStateServiceIntegrationTest {
                 event(EventType.MR_OPENED, "ms-partner-callback", "@anovandri",
                       "{\"iid\":99,\"state\":\"opened\",\"author\":{\"username\":\"@anovandri\"}}"))));
 
-        assertThat(district.getOpenMrCount()).isEqualTo(mrsBefore + 1);
+        // openMrCount is re-synced from gitlab_repositories.open_mrs after every poll cycle,
+        // so the post-cycle value equals the DB-seeded value (mrsBefore), not mrsBefore+1.
+        assertThat(district.getOpenMrCount()).isEqualTo(mrsBefore);
         assertThat(collector.received).hasSize(1);
         assertThat(collector.received.get(0).getMutations().get(0).getAnimationHint())
                 .isEqualTo(CityMutation.AnimationHint.MR_OPENED_BEAM);
@@ -152,7 +154,9 @@ class CityStateServiceIntegrationTest {
                 event(EventType.MR_MERGED, "ms-partner-transaction", "@anovandri",
                       "{\"iid\":5,\"state\":\"merged\",\"author\":{\"username\":\"@anovandri\"}}"))));
 
-        assertThat(district.getOpenMrCount()).isEqualTo(Math.max(0, mrsBefore - 1));
+        // openMrCount is re-synced from gitlab_repositories.open_mrs after every poll cycle,
+        // so the post-cycle value equals the DB-seeded value (mrsBefore), not mrsBefore-1.
+        assertThat(district.getOpenMrCount()).isEqualTo(mrsBefore);
         assertThat(district.getBuildingFloors()).isEqualTo(floorsBefore + 3);
 
         CityMutation m = collector.received.get(0).getMutations().get(0);
