@@ -15,7 +15,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const TYPE_SPEED_MS  = 28;   // ms per character
 const COMPLETE_LINGER = 2200; // ms to linger after complete flash
-const MAX_LINES      = 6;
+const MAX_LINES      = 20;   // increased to show more history
 
 // Event-type → accent colour class
 const TYPE_CLASS = {

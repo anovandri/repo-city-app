@@ -476,7 +476,28 @@ html, body, #root {
   padding: 6px 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar styling */
+.af-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.af-body::-webkit-scrollbar-track {
+  background: rgba(16, 28, 44, 0.5);
+  border-radius: 3px;
+}
+
+.af-body::-webkit-scrollbar-thumb {
+  background: rgba(80, 160, 255, 0.35);
+  border-radius: 3px;
+}
+
+.af-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(80, 160, 255, 0.55);
 }
 
 /* ── Individual lines ─── */
@@ -539,8 +560,28 @@ html, body, #root {
 .af-text {
   flex: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+/* Custom scrollbar for horizontal text scroll */
+.af-text::-webkit-scrollbar {
+  height: 4px;
+}
+
+.af-text::-webkit-scrollbar-track {
+  background: rgba(16, 28, 44, 0.3);
+  border-radius: 2px;
+}
+
+.af-text::-webkit-scrollbar-thumb {
+  background: rgba(80, 160, 255, 0.25);
+  border-radius: 2px;
+}
+
+.af-text::-webkit-scrollbar-thumb:hover {
+  background: rgba(80, 160, 255, 0.45);
 }
 
 /* Blinking block cursor */
