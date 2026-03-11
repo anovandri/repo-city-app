@@ -4,18 +4,18 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
  * ActivityFeed — terminal-style top-right ticker.
  *
  * Each incoming event goes through three phases:
- *   1. "typing"   — the line types itself out character by character
- *   2. "walking"  — developer is en-route to the building (pulsing cursor)
- *   3. "complete" — beam fired; line flashes then fades out
+ *   1. "walking"  — developer is en-route (shows "waiting for developer...")
+ *   2. "typing"   — beam fired; line types itself out character by character
+ *   3. "complete" — line flashes then fades out
  *
  * External API (via feedRef):
  *   const id = feedRef.current.push(event)   — add a new line, returns id
- *   feedRef.current.complete(id)             — mark line as complete (beam fired)
+ *   feedRef.current.complete(id)             — mark line as complete (beam fired, start typing)
  */
 
 const TYPE_SPEED_MS  = 28;   // ms per character
 const COMPLETE_LINGER = 2200; // ms to linger after complete flash
-const MAX_LINES      = 20;   // increased to show more history
+const MAX_LINES      = 25;   // limit to 25 rows as requested
 
 // Event-type → accent colour class
 const TYPE_CLASS = {
@@ -50,15 +50,21 @@ let _feedId = 0;
 
 export function ActivityFeed({ feedRef }) {
   const [lines, setLines]     = useState([]);
+  const linesRef              = useRef(lines);
   const timersRef             = useRef({});
+
+  // Keep linesRef in sync with lines state for access in callbacks
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
 
   // ── push(event) → id ─────────────────────────────────────────────────────
   const push = useCallback((event) => {
-    const id        = ++_feedId;
+    const id        = event.id ?? ++_feedId; // Use event.id for synchronization
     const typeClass = TYPE_CLASS[event.hint] ?? 'af-commit';
     const verb      = TYPE_VERB[event.hint]  ?? 'acted on';
 
-    // Full line text (typed out)
+    // Full line text (typed out when beam fires)
     const actorPart = event.actorDisplayName
       ? `${event.actorDisplayName}`
       : 'Pipeline';
@@ -68,9 +74,9 @@ export function ActivityFeed({ feedRef }) {
     const line = {
       id,
       fullText,
-      displayed: '',   // grows char by char
+      displayed: 'waiting for developer...', // Initially shows "waiting"
       typeClass,
-      phase: 'typing', // typing | walking | complete
+      phase: 'walking', // Start in walking phase (waiting for beam)
       ts: new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' }),
       hint: event.hint,
       repoIcon: event.repoIcon ?? '🏢',
@@ -81,7 +87,27 @@ export function ActivityFeed({ feedRef }) {
       return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
     });
 
-    // Start typewriter
+    return id;
+  }, []);
+
+  // ── complete(id) → start typing then flash and remove ───────────────────
+  const complete = useCallback((id) => {
+    // Find the line to get its fullText
+    const lineRef = { current: null };
+    setLines(prev => {
+      const line = prev.find(l => l.id === id);
+      if (line) lineRef.current = line;
+      // Switch to typing phase and clear displayed text
+      return prev.map(l =>
+        l.id === id ? { ...l, phase: 'typing', displayed: '' } : l
+      );
+    });
+
+    if (!lineRef.current) return;
+
+    const fullText = lineRef.current.fullText;
+    
+    // Start typewriter effect
     let charIdx = 0;
     const type = () => {
       charIdx++;
@@ -91,28 +117,17 @@ export function ActivityFeed({ feedRef }) {
       if (charIdx < fullText.length) {
         timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
       } else {
-        // Typing done → switch to walking phase
-        setLines(prev => prev.map(l => l.id === id ? { ...l, phase: 'walking' } : l));
+        // Typing done → switch to complete phase then remove
+        setLines(prev => prev.map(l => l.id === id ? { ...l, phase: 'complete' } : l));
+        
+        timersRef.current[`done_${id}`] = setTimeout(() => {
+          setLines(prev => prev.filter(l => l.id !== id));
+          delete timersRef.current[`type_${id}`];
+          delete timersRef.current[`done_${id}`];
+        }, COMPLETE_LINGER);
       }
     };
     timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
-
-    return id;
-  }, []);
-
-  // ── complete(id) → flash then remove ─────────────────────────────────────
-  const complete = useCallback((id) => {
-    // Snap displayed to full text immediately (in case still typing)
-    setLines(prev => prev.map(l =>
-      l.id === id ? { ...l, phase: 'complete', displayed: l.fullText } : l
-    ));
-    clearTimeout(timersRef.current[`type_${id}`]);
-
-    timersRef.current[`done_${id}`] = setTimeout(() => {
-      setLines(prev => prev.filter(l => l.id !== id));
-      delete timersRef.current[`type_${id}`];
-      delete timersRef.current[`done_${id}`];
-    }, COMPLETE_LINGER);
   }, []);
 
   // Expose API via ref
