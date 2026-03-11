@@ -21,10 +21,6 @@ export const HUD = React.memo(function HUD({ stats, onOpenMRPanel, onOpenDevPane
         <span className="hud-stat-value">{stats.activeDeveloperCount}</span>
       </div>
       <div className="hud-stat">
-        <span className="hud-stat-label">Commits Today</span>
-        <span className="hud-stat-value">{stats.totalCommits}</span>
-      </div>
-      <div className="hud-stat">
         <span className="hud-stat-label">🔀 Open MRs</span>
         <span className="hud-stat-value">{stats.openMrCount}</span>
       </div>

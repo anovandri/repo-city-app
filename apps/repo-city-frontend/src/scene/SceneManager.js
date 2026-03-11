@@ -381,8 +381,6 @@ export class SceneManager {
     parkAnchor.position.set(-22, 3.2, 20);
     s.add(parkAnchor);
     const parkDiv = document.createElement('div');
-    parkDiv.className = 'clan-label';
-    parkDiv.innerHTML = '<span class="clan-icon">🌳</span>City Park';
     parkAnchor.add(new CSS2DObject(parkDiv));
   }
 

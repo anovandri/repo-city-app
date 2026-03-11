@@ -2,6 +2,13 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { computeLayout } from './DistrictLayout.js';
 
+// Visual floor scaling: converts API floor count to reasonable building height
+// Formula: visualFloors = max(3, min(12, floors × 0.15))
+// This keeps buildings between 3-12 visual floors regardless of actual commit count
+const FLOOR_SCALE = 0.16;
+const MIN_VISUAL_FLOORS = 3;
+const MAX_VISUAL_FLOORS = 12;
+
 const MAT_CACHE = new Map();
 function mat(color) {
   if (!MAT_CACHE.has(color)) {
@@ -36,6 +43,12 @@ export class BuildingManager {
     this._windows   = new Map();
     /** @type {Map<string, number>}       slug → roof world-Y */
     this._roofY     = new Map();
+    /** @type {Map<string, {multiplier: number, accessoryHeight: number}>} slug → height formula */
+    this._buildingFormula = new Map();
+    /** @type {Map<string, number>}       slug → initial floor count at creation */
+    this._initialFloors = new Map();
+    /** @type {Map<string, THREE.Group>}  slug → tree group (not scaled with building) */
+    this._trees = new Map();
 
     // Compute [x, z] for every slug from district layout engine
     const layout = computeLayout(apiRepos);
@@ -80,10 +93,41 @@ export class BuildingManager {
 
   /** Dynamic floor update (called by live WebSocket events). */
   setFloors(slug, floors) {
-    this._roofY.set(slug, floors);
+    const building = this._buildings.get(slug);
+    const formula = this._buildingFormula.get(slug);
+    if (!building || !formula) {
+      // No building or formula — fallback to raw floors
+      this._roofY.set(slug, floors);
+      return;
+    }
+
+    const { multiplier, accessoryHeight } = formula;
+    const initialFloors = this._initialFloors.get(slug) || floors;
+    
+    // Scale floors to reasonable visual height (same as _scaleFloors)
+    const visualFloors = this._scaleFloors(floors);
+    const initialVisualFloors = this._scaleFloors(initialFloors);
+    
+    // Calculate new visual roof height using scaled floors
+    const newRoofY = visualFloors * multiplier + accessoryHeight;
+    this._roofY.set(slug, newRoofY);
+
+    // Calculate scale ratio to grow/shrink the building
+    const initialRoofY = initialVisualFloors * multiplier + accessoryHeight;
+    const scaleY = newRoofY / initialRoofY;
+    building.scale.y = scaleY;
   }
 
   dispose() {
+    // Clean up tree groups
+    this._trees.forEach(treeGroup => {
+      this._scene.remove(treeGroup);
+      treeGroup.traverse(child => {
+        if (child.geometry) child.geometry.dispose();
+      });
+    });
+    this._trees.clear();
+    
     MAT_CACHE.forEach(m => m.dispose());
     MAT_CACHE.clear();
   }
@@ -129,8 +173,13 @@ export class BuildingManager {
     this._sphere(g, 0.18, 0xffffcc, x + 0.6, 3.55, z);
   }
   _tree(g, x, z, h = 1.8, r = 1.1) {
-    this._cyl(g, 0.18, 0.22, h, 0x7a5230, x, h / 2, z);
-    this._sphere(g, r, 0x2e9e2e, x, h + r * 0.7, z);
+    // Trees are now added to a separate group stored in g.userData.trees
+    // This prevents them from being scaled when the building scales
+    if (!g.userData.trees) {
+      g.userData.trees = [];
+    }
+    const treeData = { x, z, h, r };
+    g.userData.trees.push(treeData);
   }
 
   _label(group, repo, roofY) {
@@ -181,12 +230,24 @@ export class BuildingManager {
   }
 
   /**
+   * Scales down floor count to reasonable visual height.
+   * Prevents buildings from becoming skyscrapers.
+   * @param {number} floors - Raw floor count from API
+   * @returns {number} Visual floor count (3-12 range)
+   */
+  _scaleFloors(floors) {
+    return Math.max(MIN_VISUAL_FLOORS, Math.min(MAX_VISUAL_FLOORS, floors * FLOOR_SCALE));
+  }
+
+  /**
    * Registers a completed building group into scene and internal maps.
    * @param {THREE.Group} group
    * @param {string} slug  — full repo slug (the API key)
    * @param {number} roofY — world-space Y of the roof top
+   * @param {number} multiplier — height multiplier per floor
+   * @param {number} accessoryHeight — fixed height of roof accessories
    */
-  _register(group, slug, roofY) {
+  _register(group, slug, roofY, multiplier = 1.0, accessoryHeight = 0) {
     const repo = this._repoMeta[slug];
     if (!repo) { console.error(`BuildingManager: unknown slug "${slug}"`); return; }
     group.position.set(repo.x, 0, repo.z);
@@ -194,13 +255,40 @@ export class BuildingManager {
     this._buildings.set(slug, group);
     this._roofY.set(slug, roofY);
     this._windows.set(slug, []);
+    this._buildingFormula.set(slug, { multiplier, accessoryHeight });
+    this._initialFloors.set(slug, repo.floors);
     this._label(group, repo, roofY);
+    
+    // Create trees as separate group (not affected by building scaling)
+    if (group.userData.trees && group.userData.trees.length > 0) {
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(repo.x, 0, repo.z);
+      
+      for (const treeData of group.userData.trees) {
+        const { x, z, h, r } = treeData;
+        // Create tree trunk (cylinder)
+        const trunkGeom = new THREE.CylinderGeometry(0.18, 0.22, h, 8);
+        const trunkMesh = new THREE.Mesh(trunkGeom, mat(0x7a5230));
+        trunkMesh.position.set(x, h / 2, z);
+        treeGroup.add(trunkMesh);
+        
+        // Create tree foliage (sphere)
+        const foliageGeom = new THREE.SphereGeometry(r, 8, 6);
+        const foliageMesh = new THREE.Mesh(foliageGeom, mat(0x2e9e2e));
+        foliageMesh.position.set(x, h + r * 0.7, z);
+        treeGroup.add(foliageMesh);
+      }
+      
+      this._scene.add(treeGroup);
+      this._trees.set(slug, treeGroup);
+    }
   }
 
   // ── ms-partner-administration ────────────────────────────────────────────
   _buildAdministration(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.2;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
     this._plane(g, 16, 14, 0x4a7a5a, 0, 0.04, 0);
     this._box(g, 12.0, h,       9.0, 0x4a6a8a, 0, h/2,       0);
@@ -217,14 +305,15 @@ export class BuildingManager {
     this._box(g, 13.0, 0.3, 0.3, 0x4a6a8a, 0, 0.3, 0);
     this._lamp(g, 4, 4); this._lamp(g, -4, 4);
     this._tree(g, -6, -6, 3.5, 2.2); this._tree(g, 6, -6, 3.5, 2.2);
-    this._register(g, slug, h + 0.9 + 0.45);
+    this._register(g, slug, h + 0.9 + 0.45, 1.2, 0.9 + 0.45); // multiplier=1.2, accessories=1.35
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-atome ─────────────────────────────────────────────────────
   _buildAtome(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.1;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.1;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x3a6a5e, 0, 0.04, 0);
     this._box(g, 9.0, h,    7.5, 0x3a6a7a, 0, h/2,     0);
@@ -240,14 +329,15 @@ export class BuildingManager {
     this._box(g, 2.0, 3.0, 0.2, 0x1e3a48, 0, 1.5, 3.55);
     this._lamp(g, -4, 3); this._lamp(g, 4, 3);
     this._tree(g, 5, -4, 3.0, 2.0);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.1, 0.75 + 0.35); // multiplier=1.1, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-callback ──────────────────────────────────────────────────
   _buildCallback(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.1;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.1;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x5a7a4e, 0, 0.04, 0);
     this._box(g, 8.5, h,    7.0, 0x5a7a6a, 0, h/2,      0);
@@ -262,14 +352,15 @@ export class BuildingManager {
     }
     this._box(g, 2.0, 3.0, 0.2, 0x2a4a3a, 0, 1.5, 3.55);
     this._lamp(g, -4, 4); this._lamp(g, 4, 4);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.1, 1.1); // Callback: multiplier=1.1, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-callback-rate-limiter ─────────────────────────────────────
   _buildCallbackRateLimiter(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x4a6a7a, 0, 0.04, 0);
     this._box(g, 8.0, h,    7.5, 0x4a6a8a, 0, h/2,      0);
@@ -286,14 +377,15 @@ export class BuildingManager {
     this._box(g, 2.0, 2.8, 0.2, 0x1a3a5a, 0, 1.4, 3.56);
     this._lamp(g, -4, 3); this._lamp(g, 4, 3);
     this._tree(g, -5, -4, 3.0, 2.0);
-    this._register(g, slug, h + 0.6 + 0.3);
+    this._register(g, slug, h + 0.6 + 0.3, 1.0, 0.9); // CallbackRateLimiter: multiplier=1.0, accessories=0.9
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-customer ──────────────────────────────────────────────────
   _buildCustomer(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.1;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.1;
     const g = new THREE.Group();
     this._plane(g, 18, 14, 0x6a5a3e, 0, 0.04, 0);
     this._box(g, 13.0, h,    9.5, 0x7a6a5a, 0, h/2,      0);
@@ -310,14 +402,15 @@ export class BuildingManager {
     this._box(g, 14.0, 0.3, 0.3, 0x7a6a5a, 0, 0.3, 0);
     this._lamp(g, -6, 4); this._lamp(g, 6, 4);
     this._tree(g, -6, -5, 3.0, 2.0);
-    this._register(g, slug, h + 0.77 + 0.35);
+    this._register(g, slug, h + 0.77 + 0.35, 1.1, 1.12); // Customer: multiplier=1.1, accessories=1.12
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-gateway ───────────────────────────────────────────────────
   _buildGateway(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.2;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
     this._plane(g, 14, 14, 0x4a6e7a, 0, 0.04, 0);
     this._box(g, 9.0, h,    8.0, 0x4a6a8a, 0, h/2,      0);
@@ -336,14 +429,15 @@ export class BuildingManager {
     this._cyl(g, 0.08, 0.1, 0.7, 0x777777, -2.5, h + 0.45, -2.5);
     this._sphere(g, 0.5, 0xccddee, -2.5, h + 1.15, -2.5);
     this._lamp(g, -4, 4); this._lamp(g, 4, 4);
-    this._register(g, slug, h + 0.85 + 0.4);
+    this._register(g, slug, h + 0.85 + 0.4, 1.2, 1.25); // Gateway: multiplier=1.2, accessories=1.25
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-integration-platform ──────────────────────────────────────
   _buildIntegration(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.2;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
     this._plane(g, 16, 14, 0x3a5a7e, 0, 0.04, 0);
     this._box(g, 11.0, h,    9.0, 0x3a5a7a, 0, h/2,      0);
@@ -363,14 +457,15 @@ export class BuildingManager {
     }
     this._lamp(g, -4, 4); this._lamp(g, 4, 4);
     this._tree(g, -6, -6, 3.5, 2.2);
-    this._register(g, slug, h + 0.95 + 0.45);
+    this._register(g, slug, h + 0.95 + 0.45, 1.2, 1.4); // Integration: multiplier=1.2, accessories=1.4
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-registration ──────────────────────────────────────────────
   _buildRegistration(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x6a7a4a, 0, 0.04, 0);
     this._box(g, 9.5, h,    8.0, 0x6a7a6a, 0, h/2,      0);
@@ -386,14 +481,15 @@ export class BuildingManager {
     this._box(g, 2.2, 3.2, 0.2, 0x3a4a3a, 0, 1.6, 4.05);
     this._lamp(g, -4, 3); this._lamp(g, 4, 3);
     this._tree(g, -6, -4, 3.0, 2.0);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.0, 1.1); // Registration: multiplier=1.0, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── ms-partner-transaction — cylindrical tower ───────────────────────────
   _buildTransaction(slug) {
     const { floors } = this._repoMeta[slug];
-    const towerH = floors * 1.6;  // taller proportionally for the tower style
+    const visualFloors = this._scaleFloors(floors);
+    const towerH = visualFloors * 1.6;  // taller proportionally for the tower style
     const g = new THREE.Group();
     this._plane(g, 14, 14, 0x4a6a4e, 0, 0.04, 0);
     this._cyl(g, 3.2, 3.4, 1.0,    0x778877, 0, 0.5,           0);
@@ -414,14 +510,15 @@ export class BuildingManager {
     }
     this._lamp(g, -5, 4); this._lamp(g, 5, 4);
     this._tree(g, 6, -5, 3.5, 2.2);
-    this._register(g, slug, capY + 5.5);
+    this._register(g, slug, capY + 5.5, 1.6, 6.5); // Transaction: multiplier=1.6, accessories=6.5
     this._windows.set(slug, []);
   }
 
   // ── ms-partner-web ───────────────────────────────────────────────────────
   _buildWeb(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.1;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.1;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x4a7a6a, 0, 0.04, 0);
     this._box(g, 9.0, h,    7.5, 0x4a7a8a, 0, h/2,      0);
@@ -437,14 +534,15 @@ export class BuildingManager {
     this._box(g, 2.2, 3.2, 0.2, 0x1a4a5a, 0, 1.6, 3.85);
     this._lamp(g, -4, 3); this._lamp(g, 4, 3);
     this._tree(g, 4, -6, 3.0, 2.0);
-    this._register(g, slug, h + 0.87 + 0.4);
+    this._register(g, slug, h + 0.87 + 0.4, 1.1, 1.27); // Web: multiplier=1.1, accessories=1.27
     this._windows.set(slug, wins);
   }
 
   // ── ms-pip-catalog ───────────────────────────────────────────────────────
   _buildPipCatalog(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.2;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x8a7a3e, 0, 0.04, 0);
     this._box(g, 9.5, h,    8.0, 0x8a7a6a, 0, h/2,      0);
@@ -462,14 +560,15 @@ export class BuildingManager {
     this._cyl(g, 0.35, 0.4, h, 0x9a8a7a,  3.5, h/2, 4.0);
     this._lamp(g, -4, 4); this._lamp(g, 4, 4);
     this._tree(g, 5, -6, 3.5, 2.2);
-    this._register(g, slug, h + 0.95 + 0.45);
+    this._register(g, slug, h + 0.95 + 0.45, 1.2, 1.4); // PipCatalog: multiplier=1.2, accessories=1.4
     this._windows.set(slug, wins);
   }
 
   // ── ms-pip-gateway ───────────────────────────────────────────────────────
   _buildPipGateway(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.1;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.1;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x7a6a3e, 0, 0.04, 0);
     this._box(g, 9.0, h,    7.5, 0x7a6a5a, 0, h/2,      0);
@@ -488,14 +587,15 @@ export class BuildingManager {
     this._box(g, 5.0, 0.5, 0.5, 0x8a7a5a,  0.0, 5.2, 3.8);
     this._lamp(g, -4, 3); this._lamp(g, 4, 3);
     this._tree(g, -6, -5, 3.0, 2.0);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.1, 1.1); // PipGateway: multiplier=1.1, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── ms-pip-resource ──────────────────────────────────────────────────────
   _buildPipResource(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x6a5a3e, 0, 0.04, 0);
     this._box(g, 10.0, h,    8.5, 0x6a5a4a, 0, h/2,      0);
@@ -509,14 +609,15 @@ export class BuildingManager {
     }
     this._box(g, 11.0, 0.3, 0.3, 0x6a5a4a, 0, 0.3, 0);
     this._lamp(g, -5, 4); this._lamp(g, 5, 4);
-    this._register(g, slug, h + 0.7 + 0.3);
+    this._register(g, slug, h + 0.7 + 0.3, 1.0, 1.0); // PipResource: multiplier=1.0, accessories=1.0
     this._windows.set(slug, []);
   }
 
   // ── ms-pip-transaction — cylindrical tower ───────────────────────────────
   _buildPipTransaction(slug) {
     const { floors } = this._repoMeta[slug];
-    const towerH = floors * 1.5;
+    const visualFloors = this._scaleFloors(floors);
+    const towerH = visualFloors * 1.5;
     const g = new THREE.Group();
     this._plane(g, 14, 14, 0x7a6a3e, 0, 0.04, 0);
     this._cyl(g, 3.0, 3.2, 1.0,    0x998855, 0, 0.5,            0);
@@ -537,14 +638,15 @@ export class BuildingManager {
     }
     this._lamp(g, -5, 4); this._lamp(g, 5, 4);
     this._tree(g, 6, -5, 3.5, 2.2);
-    this._register(g, slug, capY + 4.85);
+    this._register(g, slug, capY + 4.85, 1.5, 5.85); // PipTransaction: multiplier=1.5, accessories=5.85
     this._windows.set(slug, []);
   }
 
   // ── partner-webview-automation-test ──────────────────────────────────────
   _buildWebviewAutomation(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x6a6a3e, 0, 0.04, 0);
     this._box(g, 9.0, h,    7.5, 0x6a6a5a, 0, h/2,      0);
@@ -564,14 +666,15 @@ export class BuildingManager {
     this._sphere(g, 0.18, 0x44ff44,  2.0, h + 2.15, -2.0);
     this._lamp(g, -4, -4); this._lamp(g, 4, -4);
     this._tree(g, -5, 5, 3.0, 2.0);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.0, 1.1); // WebviewAutomation: multiplier=1.0, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── partnership-automation ───────────────────────────────────────────────
   _buildPartnershipAutomation(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x5a6a3e, 0, 0.04, 0);
     this._box(g, 9.0, h,    7.5, 0x5a6a5a, 0, h/2,      0);
@@ -589,14 +692,15 @@ export class BuildingManager {
     this._box(g, 3.0, 0.3, 0.3, 0x558855, 0, h + 1.8, 0);
     this._sphere(g, 0.3, 0x77aa77, 1.5, h + 1.8, 0);
     this._lamp(g, -4, -4); this._lamp(g, 4, -4);
-    this._register(g, slug, h + 0.75 + 0.35);
+    this._register(g, slug, h + 0.75 + 0.35, 1.0, 1.1); // PartnershipAutomation: multiplier=1.0, accessories=1.1
     this._windows.set(slug, wins);
   }
 
   // ── ms-ginpay — sunset / maintenance ─────────────────────────────────────
   _buildGinpay(slug) {
     const { floors } = this._repoMeta[slug];
-    const h = floors * 1.0;
+    const visualFloors = this._scaleFloors(floors);
+    const h = visualFloors * 1.0;
     const g = new THREE.Group();
     this._plane(g, 14, 12, 0x5a5a4a, 0, 0.04, 0);
     this._box(g, 8.5, h,     7.0, 0x7a7060, 0, h/2,      0);
@@ -625,7 +729,7 @@ export class BuildingManager {
     this._box(g, 2.6, 0.5, 0.08, 0xffaa00, 0, h + 0.62 + 1.57, 0);
     this._box(g, 0.08, 1.8, 0.08, 0x2a2a2a, -1.0, 2.0, 3.62);
     this._box(g, 1.4, 0.08, 0.08, 0x2a2a2a,  1.5, 3.8, 3.62);
-    this._register(g, slug, h + 0.62 + 2.1);
+    this._register(g, slug, h + 0.62 + 2.1, 1.0, 2.72); // Ginpay: multiplier=1.0, accessories=2.72
     this._windows.set(slug, []);
   }
 
@@ -689,7 +793,7 @@ export class BuildingManager {
       this._cyl(g, 0.18, 0.18, 1.1, 0xcc1111, bx, 0.55, -6.2);
       this._cyl(g, 0.22, 0.22, 0.18, 0xffcc00, bx, 1.2, -6.2);
     });
-    this._register(g, slug, 19.15);
+    this._register(g, slug, 19.15, 0.01, 19.15); // EOC: fixed height building
     this._windows.set(slug, []);
   }
 }

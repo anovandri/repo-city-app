@@ -52,17 +52,31 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast, on
       // ── Animation loop ──────────────────────────────────────────────
       const animate = () => {
         rafRef.current = requestAnimationFrame(animate);
-        const delta = clockRef.current.getDelta();
+        // Clamp delta to prevent teleportation when tab is inactive
+        let delta = clockRef.current.getDelta();
+        delta = Math.min(delta, 0.1); // Cap at 100ms to prevent large jumps
         developerMgr.update(delta);
         effectsMgr.update(delta);
         sceneMgr.render();
       };
+      
+      // Handle tab visibility changes
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          clockRef.current.stop();
+        } else {
+          clockRef.current.start();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
       clockRef.current.start();
       animate();
 
       // Store cleanup so the return fn can reach it even after async resolution
       canvas._cleanup = () => {
         cancelAnimationFrame(rafRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         labelMgr.dispose();
         effectsMgr.dispose();
         developerMgr.dispose();
