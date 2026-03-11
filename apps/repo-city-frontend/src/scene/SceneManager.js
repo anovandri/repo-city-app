@@ -148,9 +148,128 @@ export class SceneManager {
       s.add(g);
     };
     const lamp = (x, z) => {
+      // Lamp post pole
       cyl(0.07, 0.09, 3.5, 0x555555, x, 1.75, z);
+      // Lamp arm
       box(0.6, 0.07, 0.07, 0x555555, x + 0.3, 3.55, z);
-      sphere(0.18, 0xffffcc, x + 0.6, 3.55, z);
+      // Lamp bulb (glowing sphere)
+      const bulb = sphere(0.18, 0xffffcc, x + 0.6, 3.55, z);
+      // Add point light for night illumination
+      const light = new THREE.PointLight(0xffd580, 0.8, 8, 2);
+      light.position.set(x + 0.6, 3.55, z);
+      light.castShadow = false; // Disable shadows for performance
+      light.userData.isLampLight = true;
+      s.add(light);
+    };
+    const coffeeCart = (x, z, ry = 0) => {
+      const g = new THREE.Group();
+      // Cart base
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.7), mat(0x8b4513));
+      base.position.set(0, 0.45, 0);
+      base.castShadow = true;
+      g.add(base);
+      // Counter top
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.75), mat(0xa0522d));
+      counter.position.set(0, 0.94, 0);
+      counter.castShadow = true;
+      g.add(counter);
+      // Canopy
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.9), mat(0xff6b6b));
+      canopy.position.set(0, 1.4, 0);
+      canopy.castShadow = true;
+      g.add(canopy);
+      // Canopy poles
+      [[-0.55, 0.4], [0.55, 0.4], [-0.55, -0.4], [0.55, -0.4]].forEach(([px, pz]) => {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5), mat(0x666666));
+        pole.position.set(px, 1.15, pz);
+        g.add(pole);
+      });
+      // Coffee machine (decorative box)
+      const machine = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.4, 0.3), mat(0x333333));
+      machine.position.set(-0.3, 1.18, 0);
+      g.add(machine);
+      // Coffee cups (small cylinders)
+      [[-0.15, 0.05], [0.15, 0.05], [0.15, -0.15]].forEach(([cx, cz]) => {
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.08), mat(0xffffff));
+        cup.position.set(cx, 1.02, cz);
+        g.add(cup);
+      });
+      // Sign board
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.02), mat(0xf4e4c1));
+      sign.position.set(0, 1.15, -0.38);
+      g.add(sign);
+      // Wheels
+      [[-0.45, -0.25], [0.45, -0.25], [-0.45, 0.25], [0.45, 0.25]].forEach(([wx, wz]) => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.05), mat(0x222222));
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wx, 0.08, wz);
+        g.add(wheel);
+      });
+      g.rotation.y = ry;
+      g.position.set(x, 0, z);
+      s.add(g);
+    };
+    const fountain = (x, z) => {
+      // Base platform
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.15), mat(0x999999));
+      base.position.set(x, 0.08, z);
+      base.castShadow = true;
+      s.add(base);
+      // Water basin
+      const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.9, 0.25), mat(0x8899aa));
+      basin.position.set(x, 0.23, z);
+      basin.castShadow = true;
+      s.add(basin);
+      // Water surface (animated via rotation)
+      const waterMat = new THREE.MeshLambertMaterial({ 
+        color: 0x5599cc, 
+        transparent: true, 
+        opacity: 0.7 
+      });
+      const water = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.02), waterMat);
+      water.position.set(x, 0.36, z);
+      water.userData.isWater = true; // Mark for animation
+      s.add(water);
+      // Center pillar
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.4), mat(0xaaaaaa));
+      pillar.position.set(x, 0.55, z);
+      pillar.castShadow = true;
+      s.add(pillar);
+      // Top ornament
+      const ornament = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), mat(0xcccccc));
+      ornament.position.set(x, 0.82, z);
+      ornament.castShadow = true;
+      s.add(ornament);
+      // Water jets (small spheres for visual effect)
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const jetX = x + Math.cos(angle) * 0.5;
+        const jetZ = z + Math.sin(angle) * 0.5;
+        const jet = new THREE.Mesh(new THREE.SphereGeometry(0.05), waterMat);
+        jet.position.set(jetX, 0.4, jetZ);
+        s.add(jet);
+      }
+    };
+    const flower = (x, z, color = 0xff69b4) => {
+      // Stem
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.01, 0.15), 
+        mat(0x2d5016)
+      );
+      stem.position.set(x, 0.08, z);
+      s.add(stem);
+      // Flower head (small sphere)
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), mat(color));
+      head.position.set(x, 0.17, z);
+      s.add(head);
+    };
+    const rock = (x, z, scale = 1) => {
+      const rockGeo = new THREE.DodecahedronGeometry(0.15 * scale, 0);
+      const rock = new THREE.Mesh(rockGeo, mat(0x777777));
+      rock.position.set(x, 0.08 * scale, z);
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      rock.castShadow = true;
+      s.add(rock);
     };
 
     // ── Ground — prototype: plane(200,200,0x5aaa3c,0,0,0) ──────
@@ -365,11 +484,85 @@ export class SceneManager {
     bench(-38, 28,  Math.PI);       // south side, facing north
     bench(-28, 30,  Math.PI / 4);   // SE corner
     bench(-48, 30, -Math.PI / 4);   // SW corner
+    
+    // Additional benches along paths for social gathering
+    bench(-34, 20,  Math.PI / 2);   // E path, facing center
+    bench(-42, 20, -Math.PI / 2);   // W path, facing center
+    bench(-38, 16,  0);             // N path, facing south
+    bench(-38, 24,  Math.PI);       // S path, facing north
+    bench(-24, 14,  Math.PI / 4);   // NE area
+    bench(-52, 14, -Math.PI / 4);   // NW area
+    bench(-24, 26,  Math.PI * 3/4); // SE area
+    bench(-52, 26,  Math.PI * 5/4); // SW area
 
     // Lamp posts along paths
     lamp(-38,  8); lamp(-38, 32);
     lamp(-22, 20); lamp(-54, 20);
     lamp(-28, 20); lamp(-48, 20);
+    
+    // Additional park lamp posts for night ambiance
+    lamp(-32, 12); lamp(-44, 12);   // north path sides
+    lamp(-32, 28); lamp(-44, 28);   // south path sides
+    lamp(-24, 20); lamp(-52, 20);   // east/west ends
+    lamp(-38, 14); lamp(-38, 26);   // near center intersection
+
+    // Coffee cart — social gathering point in SE corner
+    coffeeCart(-26, 28, Math.PI / 4);
+
+    // Central fountain — decorative centerpiece with subtle animation
+    fountain(-38, 20);
+
+    // Decorative flowers scattered around the park
+    // Pink flowers near benches
+    flower(-29, 18, 0xff69b4); flower(-29.3, 18.2, 0xff1493);
+    flower(-47, 18, 0xff69b4); flower(-47.3, 18.2, 0xffc0cb);
+    flower(-38.2, 12.5, 0xff69b4); flower(-37.8, 12.5, 0xff1493);
+    flower(-38.2, 27.5, 0xff69b4); flower(-37.8, 27.5, 0xffc0cb);
+    // Yellow flowers near paths
+    flower(-34.5, 20.5, 0xffff00); flower(-34.5, 19.5, 0xffd700);
+    flower(-41.5, 20.5, 0xffff00); flower(-41.5, 19.5, 0xffd700);
+    flower(-38.5, 16.5, 0xffff00); flower(-37.5, 16.5, 0xffd700);
+    flower(-38.5, 23.5, 0xffff00); flower(-37.5, 23.5, 0xffd700);
+    // Purple/blue flowers near pond
+    flower(-40, 21, 0x9370db); flower(-40, 19, 0x8a2be2);
+    flower(-36, 21, 0x9370db); flower(-36, 19, 0x8a2be2);
+    // Red flowers in corners
+    flower(-24.5, 14.5, 0xff0000); flower(-24.5, 13.5, 0xdc143c);
+    flower(-51.5, 14.5, 0xff0000); flower(-51.5, 13.5, 0xdc143c);
+    flower(-24.5, 25.5, 0xff0000); flower(-24.5, 26.5, 0xdc143c);
+    flower(-51.5, 25.5, 0xff0000); flower(-51.5, 26.5, 0xdc143c);
+    // Orange flowers near coffee cart
+    flower(-25, 27, 0xff8c00); flower(-25.5, 27.5, 0xffa500);
+    flower(-27, 29, 0xff8c00); flower(-27.5, 29.5, 0xffa500);
+
+    // Decorative rocks scattered naturally
+    rock(-30, 16, 1.0); rock(-46, 16, 0.8);
+    rock(-30, 24, 0.9); rock(-46, 24, 1.1);
+    rock(-34, 14, 0.7); rock(-42, 14, 0.8);
+    rock(-34, 26, 1.0); rock(-42, 26, 0.9);
+    rock(-26, 16, 0.6); rock(-50, 16, 0.7);
+    rock(-26, 24, 0.8); rock(-50, 24, 0.6);
+    rock(-40, 18, 0.7); rock(-36, 22, 0.8);
+    rock(-40, 22, 0.6); rock(-36, 18, 0.7);
+    // Rock clusters near trees
+    rock(-58.5, 10.5, 0.9); rock(-57.5, 10.8, 0.6);
+    rock(-18.5, 10.5, 0.8); rock(-17.5, 10.8, 0.7);
+    rock(-28.5, 8.5, 0.9); rock(-48.5, 8.5, 1.0);
+    rock(-28.5, 33.5, 0.8); rock(-48.5, 33.5, 0.9);
+
+    // Additional bushes for more natural feel
+    bush(-25, 15); bush(-25, 25);  // near coffee cart area
+    bush(-51, 15); bush(-51, 25);  // west side
+    bush(-35, 13); bush(-41, 13);  // north side clusters
+    bush(-35, 27); bush(-41, 27);  // south side clusters
+    bush(-33, 20); bush(-43, 20);  // along main E-W path
+    bush(-38, 17); bush(-38, 23);  // along main N-S path
+    // Bush pairs near benches
+    bush(-29.5, 19); bush(-46.5, 19);
+    bush(-37.5, 13); bush(-37.5, 29);
+    // Corner decorative bushes
+    bush(-23, 13); bush(-53, 13);
+    bush(-23, 27); bush(-53, 27);
 
     // Park entrance gate posts
     box(0.4, 2.4, 0.4, 0x888877, -14, 1.2, 20);   // east post
@@ -407,6 +600,15 @@ export class SceneManager {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  update(delta) {
+    // Animate fountain water with gentle rotation
+    this._scene.traverse(obj => {
+      if (obj.userData.isWater) {
+        obj.rotation.y += delta * 0.3; // Slow rotation for water effect
+      }
+    });
+  }
 
   render() {
     this._controls.update();

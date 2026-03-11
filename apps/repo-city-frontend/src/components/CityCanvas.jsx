@@ -55,6 +55,7 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast, on
         // Clamp delta to prevent teleportation when tab is inactive
         let delta = clockRef.current.getDelta();
         delta = Math.min(delta, 0.1); // Cap at 100ms to prevent large jumps
+        sceneMgr.update(delta);   // Update scene animations (fountain, etc.)
         developerMgr.update(delta);
         effectsMgr.update(delta);
         sceneMgr.render();
