@@ -59,6 +59,12 @@ export const WAYPOINTS = [
   new THREE.Vector3( 40, 0,  20),  // 51
   new THREE.Vector3(  8, 0, -36),  // 52
   new THREE.Vector3( 20, 0,   0),  // 53
+  // Path to SW City Park
+  new THREE.Vector3(-12, 0,   8),  // 54 - southwest from plaza
+  new THREE.Vector3(-24, 0,  14),  // 55 - continuing southwest
+  new THREE.Vector3(-38, 0,  20),  // 56 - park entrance (center)
+  new THREE.Vector3(-14, 0,  20),  // 57 - park east entrance
+  new THREE.Vector3(-26, 0,  28),  // 58 - coffee cart area (SE corner)
 ];
 
 /**
@@ -66,7 +72,7 @@ export const WAYPOINTS = [
  * Each entry lists the waypoint indices reachable from that waypoint.
  */
 export const ROAD_GRAPH = [
-  [1, 53],          //  0
+  [1, 53, 54],      //  0 - added connection to park path
   [0, 2, 39, 42],   //  1
   [1, 3, 6],        //  2
   [2, 4, 7],        //  3
@@ -120,4 +126,9 @@ export const ROAD_GRAPH = [
   [46],             // 51
   [43],             // 52
   [0, 44],          // 53
+  [0, 55, 57],      // 54 - southwest path from plaza, connects to 55 and 57
+  [54, 56],         // 55 - continues to park center
+  [55, 57],         // 56 - park center, connects to 55 and 57
+  [54, 56, 58],     // 57 - park east entrance, connects to coffee cart
+  [57],             // 58 - coffee cart area (SE corner)
 ];

@@ -20,6 +20,33 @@ const HAT_COLORS = [
 // Caretakers only patrol between plaza (0) and EOC approach (53)
 const CARETAKER_WPS = [0, 53];
 
+// Park waypoints - path from plaza (0) to SW City Park
+// 54: (-12, 8) southwest from plaza
+// 55: (-24, 14) continuing southwest  
+// 56: (-38, 20) park center entrance
+// 57: (-14, 20) park east entrance
+const PARK_WAYPOINTS = [54, 55, 56, 57, 58]; // Waypoints leading to and around park (58 is at coffee cart)
+
+// Park gathering spots for night mode (SW City Park area around fountain and coffee cart)
+// Park is centered at (-38, 20) with fountain and coffee cart
+// Coffee cart is at (-26, 28)
+const PARK_SPOTS = [
+  { x: -26, z: 28 },  // At coffee cart (priority spot)
+  { x: -28, z: 26 },  // Near coffee cart west
+  { x: -24, z: 26 },  // Near coffee cart east
+  { x: -26, z: 30 },  // South of coffee cart
+  { x: -30, z: 28 },  // West area near cart
+  { x: -22, z: 28 },  // East area near cart
+  { x: -38, z: 20 },  // Near fountain (center)
+  { x: -34, z: 24 },  // Between cart and fountain
+  { x: -32, z: 28 },  // South area
+  { x: -28, z: 18 },  // East benches
+  { x: -48, z: 18 },  // West benches
+  { x: -38, z: 12 },  // North benches
+  { x: -38, z: 28 },  // South benches
+  { x: -42, z: 20 },  // West path
+];
+
 export class DeveloperManager {
   /**
    * @param {THREE.Scene} scene
@@ -31,6 +58,7 @@ export class DeveloperManager {
     this._devs        = [];
     this._geoCache    = new Map();
     this._buildingMgr = null;  // set via setBuildingManager() after construction
+    this._isNightMode = false; // Night mode state
 
     // Normalise from API format to internal format.
     // API: { displayName, gitlabUsername, role: 'ENGINEER', gender: 'MALE' }
@@ -50,6 +78,40 @@ export class DeveloperManager {
   /** Inject the BuildingManager so dispatch can find waypoints by building position. */
   setBuildingManager(bm) {
     this._buildingMgr = bm;
+  }
+
+  /**
+   * Toggle night mode: when enabled, developers congregate in the park area.
+   * @param {boolean} isNight - true for night mode, false for day mode
+   */
+  setNightMode(isNight) {
+    if (this._isNightMode === isNight) return;
+    this._isNightMode = isNight;
+
+    // Redirect non-leader, non-dispatched developers to park area
+    this._devs.forEach(dev => {
+      if (dev.role === 'leader') return; // Leader stays seated
+      if (dev._dispatched || dev._working) return; // Don't interrupt active devs
+
+      if (isNight) {
+        // Mark as wanting to go to park - navigate via waypoint path
+        dev._parkMode = true;
+        dev._parkTarget = null; // Will be set once they reach park waypoint
+        // Navigate directly to waypoint 56 (fountain at park center)
+        dev.nextWpIdx = 56; // Fountain/park center
+      } else {
+        // Day mode: exit park and resume normal wandering
+        dev._parkMode = false;
+        dev._parkTarget = null;
+        
+        // If developer is currently in park area, direct them to plaza (waypoint 0)
+        if (PARK_WAYPOINTS.includes(dev.wpIdx)) {
+          dev.nextWpIdx = 0; // Plaza center - exit park
+        } else {
+          dev.nextWpIdx = this._pickNext(dev);
+        }
+      }
+    });
   }
 
   /** Call once per animation frame. @param {number} delta seconds */
@@ -118,6 +180,7 @@ export class DeveloperManager {
 
     // Mark as dispatched so they won't be double-dispatched by another event
     dev._dispatched   = true;
+    dev._parkMode     = false; // Exit park mode when dispatched to work
     dev._onArrived    = onArrived;
     dev._destWpIdx    = wpIdx;
     dev._path         = path.slice(1); // remaining hops (excluding current wp)
@@ -402,6 +465,9 @@ export class DeveloperManager {
     if (dev.role === 'caretaker') {
       return dev.wpIdx === CARETAKER_WPS[0] ? CARETAKER_WPS[1] : CARETAKER_WPS[0];
     }
+    
+    // In park mode, continue navigating toward park waypoints via road network
+    // Once at park waypoint, _walkDev will handle the transition to free roaming
     const neighbours = ROAD_GRAPH[dev.wpIdx];
     if (!neighbours || neighbours.length === 0) return dev.wpIdx;
     return neighbours[Math.floor(Math.random() * neighbours.length)];
@@ -409,6 +475,39 @@ export class DeveloperManager {
 
   _walkDev(dev, delta) {
     if (dev._working) return;       // freeze at building while in typing pose
+
+    // Handle park mode with direct position targets
+    if (dev._parkMode && dev._parkTarget) {
+      const target = dev._parkTarget;
+      const dx = target.x - dev.group.position.x;
+      const dz = target.z - dev.group.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist < 0.3) {
+        // Arrived at park spot - pick a new spot to keep moving
+        // 60% chance to stay near coffee cart area (first 6 spots)
+        const spotIndex = Math.random() < 0.6 
+          ? Math.floor(Math.random() * 6)
+          : Math.floor(Math.random() * PARK_SPOTS.length);
+        dev._parkTarget = PARK_SPOTS[spotIndex];
+      } else {
+        // Walk slowly toward park target (30% of normal speed)
+        const nx = dx / dist;
+        const nz = dz / dist;
+        const parkSpeed = dev.speed * 0.3; // Slow, leisurely pace
+        dev.group.position.x += nx * parkSpeed * delta;
+        dev.group.position.z += nz * parkSpeed * delta;
+
+        // Face the direction of movement
+        const angle = Math.atan2(nz, nx);
+        dev.group.rotation.y = angle - Math.PI / 2;
+
+        // limbTime will be animated by _animateLimbs which is called separately
+      }
+      return;
+    }
+
+    // Normal waypoint navigation
     if (dev.nextWpIdx === null) return;
 
     const target = WAYPOINTS[dev.nextWpIdx];
@@ -423,6 +522,19 @@ export class DeveloperManager {
       // Snap to waypoint
       dev.group.position.set(target.x, 0, target.z);
       dev.wpIdx = dev.nextWpIdx;
+
+      // ── Check if arrived at park waypoint ─────────────────────
+      if (dev._parkMode && this._isNightMode && PARK_WAYPOINTS.includes(dev.wpIdx)) {
+        // Arrived at park entrance - assign a park spot near coffee cart (prioritize first 6 spots)
+        // 60% chance to pick from first 6 spots (near coffee cart), 40% for any spot
+        const spotIndex = Math.random() < 0.6 
+          ? Math.floor(Math.random() * 6)  // First 6 spots are near coffee cart
+          : Math.floor(Math.random() * PARK_SPOTS.length);
+        dev._parkTarget = PARK_SPOTS[spotIndex];
+        console.log(`[Park] Dev ${dev.data.name} arrived at waypoint ${dev.wpIdx}, heading to coffee cart area:`, dev._parkTarget);
+        dev.nextWpIdx = null; // Stop waypoint navigation, use direct park targeting
+        return;
+      }
 
       // ── Dispatched arrival check ──────────────────────────────
       if (dev._dispatched && dev.wpIdx === dev._destWpIdx) {
@@ -494,7 +606,16 @@ export class DeveloperManager {
   _releaseWorking(dev) {
     dev._working  = false;
     dev._path     = null;
-    dev.nextWpIdx = this._pickNext(dev);
+    
+    // If night mode, return to park; otherwise resume normal wandering
+    if (this._isNightMode && dev.role !== 'leader' && dev.role !== 'caretaker') {
+      dev._parkMode = true;
+      dev._parkTarget = null; // Will be assigned when reaching park waypoint
+      // Navigate to park center or east entrance
+      dev.nextWpIdx = Math.random() < 0.5 ? 56 : 57;
+    } else {
+      dev.nextWpIdx = this._pickNext(dev);
+    }
   }
 
   /**

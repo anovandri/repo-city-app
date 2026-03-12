@@ -10,6 +10,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 export class SceneManager {
   constructor(canvas) {
     this._canvas = canvas;
+    this._isNightMode = false;
     this._initScene();
     this._initRenderers(canvas);
     this._initCamera();
@@ -26,6 +27,7 @@ export class SceneManager {
   get renderer() { return this._renderer; }
   get css2d()    { return this._css2d; }
   get controls() { return this._controls; }
+  get isNightMode() { return this._isNightMode; }
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -63,22 +65,25 @@ export class SceneManager {
 
   _initLights() {
     // Ambient fill — prototype: AmbientLight(0xffffff, 0.6)
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    this._scene.add(ambient);
+    this._ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    this._scene.add(this._ambient);
 
     // Sun — prototype: DirectionalLight(0xfffbe0, 1.2) at (15,25,15)
-    const sun = new THREE.DirectionalLight(0xfffbe0, 1.2);
-    sun.position.set(15, 25, 15);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 300;
-    sun.shadow.camera.left = -120;
-    sun.shadow.camera.right = 120;
-    sun.shadow.camera.top = 120;
-    sun.shadow.camera.bottom = -120;
-    sun.shadow.bias = -0.001;
-    this._scene.add(sun);
+    this._sun = new THREE.DirectionalLight(0xfffbe0, 1.2);
+    this._sun.position.set(15, 25, 15);
+    this._sun.castShadow = true;
+    this._sun.shadow.mapSize.set(2048, 2048);
+    this._sun.shadow.camera.near = 1;
+    this._sun.shadow.camera.far = 300;
+    this._sun.shadow.camera.left = -120;
+    this._sun.shadow.camera.right = 120;
+    this._sun.shadow.camera.top = 120;
+    this._sun.shadow.camera.bottom = -120;
+    this._sun.shadow.bias = -0.001;
+    this._scene.add(this._sun);
+    
+    // Collect all lamp lights for night mode toggling
+    this._lampLights = [];
   }
 
   _initEnvironment() {
@@ -155,11 +160,12 @@ export class SceneManager {
       // Lamp bulb (glowing sphere)
       const bulb = sphere(0.18, 0xffffcc, x + 0.6, 3.55, z);
       // Add point light for night illumination
-      const light = new THREE.PointLight(0xffd580, 0.8, 8, 2);
+      const light = new THREE.PointLight(0xffd580, 0, 8, 2); // Start with intensity 0 (day mode)
       light.position.set(x + 0.6, 3.55, z);
       light.castShadow = false; // Disable shadows for performance
       light.userData.isLampLight = true;
       s.add(light);
+      this._lampLights.push(light); // Store for day/night toggling
     };
     const coffeeCart = (x, z, ry = 0) => {
       const g = new THREE.Group();
@@ -328,6 +334,11 @@ export class SceneManager {
     plane(40, 3.2, 0xc0bdb5,  32, 0.035, -56);
     // Standalone approach road
     plane(28, 3.2, 0xc0bdb5,  36, 0.035,  12);
+    // Path to SW City Park (tan/beige footpath)
+    plane(3.2, 18, 0xd4c090, -12, 0.032,   8);  // From plaza southwest
+    plane(3.2, 14, 0xd4c090, -24, 0.032,  14);  // Continue southwest
+    plane(3.2, 8,  0xd4c090, -14, 0.032,  20);  // East park entrance
+    plane(3.2, 10, 0xd4c090, -20, 0.032,  24);  // From east gate to coffee cart
     // Intersection pads (0xb8b5ad)
     [[-16,-8],[-32,-8],[-48,-8],[-64,-8],
      [-16,-24],[-32,-24],[-48,-24],[-64,-24],
@@ -597,6 +608,81 @@ export class SceneManager {
       this._css2d.setSize(w, h);
     };
     window.addEventListener('resize', this._onResize);
+  }
+
+  // ── Day/Night Cycle ──────────────────────────────────────────────────────
+
+  /**
+   * Toggle between day and night modes with smooth transitions.
+   * @param {boolean} isNight - true for night mode, false for day mode
+   */
+  setDayNightMode(isNight) {
+    if (this._isNightMode === isNight) return; // Already in this mode
+    this._isNightMode = isNight;
+
+    const duration = 2000; // 2 seconds transition
+    const startTime = Date.now();
+
+    // Day mode colors
+    const daySkyColor = new THREE.Color(0x87ceeb);
+    const dayFogColor = new THREE.Color(0x87ceeb);
+    const dayAmbientIntensity = 0.6;
+    const daySunIntensity = 1.2;
+    const dayLampIntensity = 0;
+
+    // Night mode colors
+    const nightSkyColor = new THREE.Color(0x1a2332);
+    const nightFogColor = new THREE.Color(0x1a2332);
+    const nightAmbientIntensity = 0.35;
+    const nightSunIntensity = 0.15;
+    const nightLampIntensity = 0.8;
+
+    // Start values
+    const startSky = this._scene.background.clone();
+    const startFog = this._scene.fog.color.clone();
+    const startAmbient = this._ambient.intensity;
+    const startSun = this._sun.intensity;
+    const startLamp = this._lampLights.length > 0 ? this._lampLights[0].intensity : 0;
+
+    // Target values
+    const targetSky = isNight ? nightSkyColor : daySkyColor;
+    const targetFog = isNight ? nightFogColor : dayFogColor;
+    const targetAmbient = isNight ? nightAmbientIntensity : dayAmbientIntensity;
+    const targetSun = isNight ? nightSunIntensity : daySunIntensity;
+    const targetLamp = isNight ? nightLampIntensity : dayLampIntensity;
+
+    // Animate transition
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = this._easeInOutCubic(progress);
+
+      // Interpolate colors
+      this._scene.background.lerpColors(startSky, targetSky, eased);
+      this._scene.fog.color.lerpColors(startFog, targetFog, eased);
+
+      // Interpolate light intensities
+      this._ambient.intensity = startAmbient + (targetAmbient - startAmbient) * eased;
+      this._sun.intensity = startSun + (targetSun - startSun) * eased;
+
+      // Update all lamp lights
+      this._lampLights.forEach(light => {
+        light.intensity = startLamp + (targetLamp - startLamp) * eased;
+      });
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  }
+
+  /**
+   * Easing function for smooth transitions
+   */
+  _easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   // ── Render ───────────────────────────────────────────────────────────────

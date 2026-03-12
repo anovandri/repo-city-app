@@ -27,7 +27,11 @@ function getAvatar(person) {
  *   devActivity — { [displayName]: { commits, mrsOpened, mrsMerged, pipelines, byRepo } }
  *   onClose     — () => void
  */
-export const DevPanel = React.memo(function DevPanel({ workers = [], devActivity, onClose }) {
+export const DevPanel = React.memo(function DevPanel({ 
+  workers = [], 
+  devActivity, 
+  onClose
+}) {
   const [query, setQuery]     = useState('');
   const [selected, setSelected] = useState(null);
 

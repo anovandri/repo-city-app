@@ -46,7 +46,7 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast, on
 
       // Expose imperative API to App
       if (sceneRef) {
-        sceneRef.current = { buildingMgr, effectsMgr, developerMgr };
+        sceneRef.current = { sceneMgr, buildingMgr, effectsMgr, developerMgr };
       }
 
       // ── Animation loop ──────────────────────────────────────────────

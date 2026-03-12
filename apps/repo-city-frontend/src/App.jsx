@@ -18,7 +18,7 @@ import { useCityState }  from './hooks/useCityState.js';
  *  - useWebSocket pipes snapshot → applySnapshot and mutations → applyMutation + 3D effects
  */
 export default function App() {
-  const sceneRef           = useRef(null);  // { buildingMgr, effectsMgr, developerMgr }
+  const sceneRef           = useRef(null);  // { sceneMgr, buildingMgr, effectsMgr, developerMgr }
   const toastRef           = useRef(null);  // addToast function from Toast component
   const activityFeedRef    = useRef(null);  // { push, complete } from ActivityFeed
   const snapshotApplied    = useRef(false); // true once the first snapshot has been applied
@@ -26,6 +26,7 @@ export default function App() {
   const [showMR,  setShowMR]  = useState(false);
   const [showDev, setShowDev] = useState(false);
   const [showSim, setShowSim] = useState(false);
+  const [isNightMode, setIsNightMode] = useState(false);
   const [workers, setWorkers] = useState([]);
   // slug → gitlabMrListUrl (populated on mount from /api/repos)
   const [mrListUrls, setMrListUrls] = useState({});
@@ -115,6 +116,18 @@ export default function App() {
     activityFeedRef.current?.[action]?.(data);
   }, []);
 
+  // Day/Night toggle callback
+  // TODO: In future, this should be automatically triggered via WebSocket based on server time
+  // Server time logic: 7AM-6PM = day (false), 6PM-7AM = night (true)
+  const handleToggleDayNight = useCallback(() => {
+    setIsNightMode(prev => {
+      const newMode = !prev;
+      sceneRef.current?.sceneMgr?.setDayNightMode(newMode);
+      sceneRef.current?.developerMgr?.setNightMode(newMode);
+      return newMode;
+    });
+  }, []);
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* Full-screen Three.js canvas */}
@@ -129,10 +142,22 @@ export default function App() {
 
       {/* Overlay panels */}
       {showMR  && <MRPanel  mrMap={mrMap} mrListUrls={mrListUrls} onClose={() => setShowMR(false)} />}
-      {showDev && <DevPanel workers={workers} devActivity={devActivity} onClose={() => setShowDev(false)} />}
+      {showDev && (
+        <DevPanel 
+          workers={workers} 
+          devActivity={devActivity} 
+          onClose={() => setShowDev(false)}
+        />
+      )}
 
       {/* Simulation panel — toggle with Alt+S */}
-      {showSim && <SimPanel onClose={() => setShowSim(false)} />}
+      {showSim && (
+        <SimPanel 
+          onClose={() => setShowSim(false)}
+          onToggleDayNight={handleToggleDayNight}
+          isNightMode={isNightMode}
+        />
+      )}
 
       {/* Activity Feed — terminal-style event log, top-right */}
       <ActivityFeed feedRef={activityFeedRef} />

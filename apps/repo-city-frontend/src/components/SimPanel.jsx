@@ -64,6 +64,22 @@ const S = {
     lineHeight: 1,
     padding: '0 2px',
   },
+  dayNightToggle: (isNight) => ({
+    background: isNight ? '#1a2332' : '#87ceeb',
+    border: '1px solid rgba(100,180,255,0.3)',
+    borderRadius: '6px',
+    color: isNight ? '#ffd580' : '#fff',
+    padding: '4px 10px',
+    fontSize: '11px',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    fontWeight: 600,
+    transition: 'all 0.3s',
+    marginRight: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  }),
   label: {
     display: 'block',
     marginBottom: '4px',
@@ -181,7 +197,7 @@ const S = {
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-export function SimPanel({ onClose }) {
+export function SimPanel({ onClose, onToggleDayNight, isNightMode }) {
   const [repos,        setRepos]        = useState([]);
   const [workers,      setWorkers]      = useState([]);
   const [selectedRepo, setSelectedRepo] = useState('');
@@ -257,7 +273,15 @@ export function SimPanel({ onClose }) {
       {/* Header */}
       <div style={S.header}>
         <span style={S.title}>⚡ Simulation Panel</span>
-        <button style={S.closeBtn} onClick={onClose} title="Close (⌥S)">✕</button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {onToggleDayNight && (
+            <button style={S.dayNightToggle(isNightMode)} onClick={onToggleDayNight} title="Toggle day/night cycle">
+              <span>{isNightMode ? '🌙' : '☀️'}</span>
+              <span>{isNightMode ? 'Night' : 'Day'}</span>
+            </button>
+          )}
+          <button style={S.closeBtn} onClick={onClose} title="Close (⌥S)">✕</button>
+        </div>
       </div>
 
       {/* Repo selector */}
