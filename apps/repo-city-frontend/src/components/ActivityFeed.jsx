@@ -169,12 +169,12 @@ export function ActivityFeed({ feedRef }) {
             {/* The typed text */}
             <span className="af-text">
               {line.displayed}
-              {/* Blinking cursor while typing or walking */}
-              {(line.phase === 'typing' || line.phase === 'walking') && (
+              {/* Blinking cursor while typing or walking (NOT during complete) */}
+              {line.phase !== 'complete' && (line.phase === 'typing' || line.phase === 'walking') && (
                 <span className={`af-cursor ${line.phase === 'walking' ? 'af-cursor-walk' : ''}`}>▋</span>
               )}
-              {/* Walking indicator */}
-              {line.phase === 'walking' && (
+              {/* Walking indicator (NOT during complete) */}
+              {line.phase === 'walking' && line.phase !== 'complete' && (
                 <span className="af-walking"> 🚶</span>
               )}
               {/* Done tick */}

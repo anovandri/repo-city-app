@@ -129,7 +129,16 @@ export class EffectsManager {
       this._spawnBeamEffect(mutation, top, color, icon, dur, toastMsg);
     };
 
-    if (this._developerMgr) {
+    // Pipeline events fire immediately (no developer walk)
+    const isPipelineEvent = hint === HINT.PIPELINE_RUNNING || 
+                           hint === HINT.PIPELINE_SUCCESS || 
+                           hint === HINT.PIPELINE_FAILED;
+
+    if (isPipelineEvent) {
+      // Fire immediately for pipeline events
+      fireBeam();
+    } else if (this._developerMgr) {
+      // For user-triggered events, dispatch developer to walk there
       this._developerMgr.dispatch(actorUsername, repoSlug, fireBeam);
     } else {
       // No developer manager — fire immediately (fallback)
