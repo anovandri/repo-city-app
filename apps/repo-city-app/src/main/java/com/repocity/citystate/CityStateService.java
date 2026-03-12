@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.repocity.citystate.event.CityMutation;
 import com.repocity.citystate.event.CityMutation.AnimationHint;
 import com.repocity.citystate.event.CityMutationEvent;
+import com.repocity.citystate.event.ImmediatePollRequested;
 import com.repocity.citystate.event.PollCycleCompleted;
 import com.repocity.citystate.model.CityState;
 import com.repocity.citystate.model.DistrictState;
@@ -19,14 +20,17 @@ import com.repocity.identity.domain.UserRole;
 import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.domain.PollEvent;
+import com.repocity.poller.repository.PollEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -62,8 +66,13 @@ public class CityStateService {
     private final RepoRepository       repoRepo;
     private final GitlabUserRepository userRepo;
     private final CitySnapshotRepository snapshotRepo;
+    private final PollEventRepository pollEventRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+
+    /** Phase 2: Bootstrap staleness threshold in minutes. */
+    @Value("${repocity.citystate.bootstrap.staleness-threshold-minutes:5}")
+    private int stalenessThresholdMinutes;
 
     /** The single in-memory city state instance. Mutated under its own monitor. */
     private final CityState cityState = new CityState();
@@ -71,11 +80,13 @@ public class CityStateService {
     public CityStateService(RepoRepository repoRepo,
                             GitlabUserRepository userRepo,
                             CitySnapshotRepository snapshotRepo,
+                            PollEventRepository pollEventRepository,
                             ApplicationEventPublisher eventPublisher,
                             ObjectMapper objectMapper) {
         this.repoRepo      = repoRepo;
         this.userRepo      = userRepo;
         this.snapshotRepo  = snapshotRepo;
+        this.pollEventRepository = pollEventRepository;
         this.eventPublisher= eventPublisher;
         this.objectMapper  = objectMapper;
     }
@@ -83,48 +94,117 @@ public class CityStateService {
     // ── Bootstrap ──────────────────────────────────────────────────────────────
 
     /**
-     * Initialises districts and workers from identity data on startup.
-     * Listening to {@link ApplicationReadyEvent} guarantees that the datasource
+     * Phase 5: Refactored bootstrap logic with event-based communication.
+     *
+     * <h3>Bootstrap Strategy</h3>
+     * <ol>
+     *   <li>Always load master data (repos & users metadata)</li>
+     *   <li>Check for existing snapshot</li>
+     *   <li>If no snapshot exists, trigger immediate poll</li>
+     *   <li>If snapshot exists:
+     *     <ul>
+     *       <li>Restore state from snapshot</li>
+     *       <li>Check staleness against configured threshold</li>
+     *       <li>If stale (&gt; threshold), trigger immediate poll to refresh</li>
+     *     </ul>
+     *   </li>
+     * </ol>
+     *
+     * <p>Listening to {@link ApplicationReadyEvent} guarantees that the datasource
      * initialization (data.sql) has already run before we query the identity tables.
      */
     @EventListener(ApplicationReadyEvent.class)
     void bootstrap() {
-        if (!tryRestoreFromSnapshot()) {
-            seedFromDb();
+        log.info("Starting city state bootstrap...");
+
+        // Step 1: Always load master data (repos & users metadata)
+        loadMasterData();
+
+        // Step 2: Check for snapshot
+        Optional<CitySnapshot> latestSnapshot = snapshotRepo.findTopByOrderByCreatedAtDesc();
+
+        if (latestSnapshot.isEmpty()) {
+            // No snapshot - first run scenario
+            log.info("No snapshot found, triggering initial poll");
+            eventPublisher.publishEvent(new ImmediatePollRequested("No snapshot found"));
+
+        } else {
+            CitySnapshot snapshot = latestSnapshot.get();
+            Duration staleness = snapshot.getStaleness();
+
+            log.info("Found snapshot from {} (age: {} minutes)",
+                    snapshot.getCreatedAt(),
+                    staleness.toMinutes());
+
+            // Step 3: Restore from snapshot
+            restoreFromSnapshot(snapshot);
+
+            // Step 4: Check staleness and refresh if needed
+            if (staleness.toMinutes() > stalenessThresholdMinutes) {
+                log.warn("Snapshot is stale (>{} min), triggering immediate poll",
+                        stalenessThresholdMinutes);
+                eventPublisher.publishEvent(new ImmediatePollRequested(
+                        String.format("Snapshot stale (%d minutes old)", staleness.toMinutes())));
+            } else {
+                log.info("Snapshot is recent (<{} min), using as-is",
+                        stalenessThresholdMinutes);
+            }
         }
 
-        // Always overwrite per-district open MR counts from the DB after bootstrap,
-        // regardless of whether we restored from a snapshot or seeded fresh.
-        // openMrCount is @JsonIgnore in DistrictState so snapshots never carry stale
-        // values — this call is the single authoritative source for open MR counts.
-        synchronized (cityState) {
-            refreshOpenMrCountsFromDb();
-        }
-
-        log.info("City state bootstrapped: {} districts, {} workers, {} total commits, {} total merges, {} active developers, {} open MR",
-                 cityState.getDistricts().size(), cityState.getWorkers().size(), cityState.getTotalCommits(), cityState.getTotalMrsMerged(), cityState.getActiveDeveloperCount(), cityState.getDistricts().values().stream().mapToInt(DistrictState::getOpenMrCount).sum());
+        log.info("Bootstrap complete: {} districts, {} workers, {} total commits, {} open MRs",
+                cityState.getDistricts().size(),
+                cityState.getWorkers().size(),
+                cityState.getTotalCommits(),
+                cityState.getDistricts().values().stream()
+                        .mapToInt(DistrictState::getOpenMrCount).sum());
     }
 
     /**
-     * Attempts to restore the city state from the most recent persisted snapshot.
-     *
-     * @return {@code true} if a snapshot was found and successfully deserialized;
-     *         {@code false} if no snapshot exists or deserialization failed (caller
-     *         should fall back to {@link #seedFromDb()}).
+     * Phase 2: Loads master data (repos & users metadata) from identity module.
+     * Called at the start of bootstrap before snapshot restore or poll.
      */
-    private boolean tryRestoreFromSnapshot() {
-        Optional<CitySnapshot> latest = snapshotRepo.findTopByOrderByCreatedAtDesc();
-        if (latest.isEmpty()) return false;
+    private void loadMasterData() {
+        // Load districts (repos metadata only, no state)
+        for (GitLabRepository repo : repoRepo.findAll()) {
+            cityState.putDistrict(new DistrictState(
+                    repo.getSlug(),
+                    repo.getName(),
+                    repo.getIcon(),
+                    repo.getStatus(),
+                    0));  // Initial count = 0, will be set by poll/snapshot
+        }
 
+        // Load workers (users metadata)
+        for (GitlabUser user : userRepo.findAll()) {
+            cityState.putWorker(new WorkerState(
+                    user.getDisplayName(),
+                    user.getRole(),
+                    user.getGender()));
+        }
+
+        log.debug("Master data loaded: {} repos, {} users",
+                cityState.getDistricts().size(),
+                cityState.getWorkers().size());
+    }
+
+    /**
+     * Phase 2: Restores the city state from a persisted snapshot.
+     * Merges snapshot state into existing master data loaded by {@link #loadMasterData()}.
+     */
+    private void restoreFromSnapshot(CitySnapshot snapshot) {
         try {
-            CityState persisted = objectMapper.readValue(latest.get().getPayload(), CityState.class);
+            CityState persisted = objectMapper.readValue(snapshot.getPayload(), CityState.class);
             synchronized (cityState) {
-                cityState.getDistricts().clear();
-                persisted.getDistricts().values().forEach(cityState::putDistrict);
+                // Restore district state (merge into existing districts loaded from master data)
+                persisted.getDistricts().forEach((slug, district) -> {
+                    DistrictState existing = cityState.getDistricts().get(slug);
+                    if (existing != null) {
+                        // Only restore openMrCount - other fields will be rebuilt from poll_events
+                        existing.setOpenMrCount(district.getOpenMrCount());
+                    }
+                });
 
-                cityState.getWorkers().clear();
-                persisted.getWorkers().values().forEach(cityState::putWorker);
-
+                // Restore aggregates
                 cityState.restoreAggregates(
                         persisted.getTotalCommits(),
                         persisted.getTotalMrsMerged(),
@@ -133,31 +213,9 @@ public class CityStateService {
             log.info("City state restored from snapshot: {} districts, {} workers, {} total commits, {} total merges",
                     cityState.getDistricts().size(), cityState.getWorkers().size(),
                     cityState.getTotalCommits(), cityState.getTotalMrsMerged());
-            return true;
         } catch (Exception e) {
-            log.warn("Failed to restore city snapshot: {} — falling back to seeded identity data", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Seeds the city state from the identity module (repositories + developers).
-     * Called when no usable snapshot is available.
-     */
-    private void seedFromDb() {
-        for (GitLabRepository repo : repoRepo.findAll()) {
-            cityState.putDistrict(new DistrictState(
-                    repo.getSlug(),
-                    repo.getName(),
-                    repo.getIcon(),
-                    repo.getStatus(),
-                    repo.getOpenMrs()));
-        }
-        for (GitlabUser user : userRepo.findAll()) {
-            cityState.putWorker(new WorkerState(
-                    user.getDisplayName(),
-                    user.getRole(),
-                    user.getGender()));
+            log.error("Failed to restore city snapshot: {}", e.getMessage(), e);
+            throw new RuntimeException("Snapshot restore failed", e);
         }
     }
 
@@ -337,23 +395,24 @@ public class CityStateService {
     // ── Snapshot persistence ───────────────────────────────────────────────────
 
     /**
-     * Re-reads {@code open_mrs} from {@link GitLabRepository} rows and pushes the
+     * Re-computes {@code openMrCount} from {@code poll_events} table and pushes the
      * values into the matching in-memory {@link DistrictState} entries.
      *
      * <p>Must be called while holding the lock on {@code cityState}. Incremental
      * MR_OPENED / MR_MERGED event deltas can drift (especially when historical
-     * events are replayed), so the DB column is treated as the single source of
-     * truth for the open-MR count.
+     * events are replayed), so we recompute from the event log as the source of truth.
      */
     private void refreshOpenMrCountsFromDb() {
         List<GitLabRepository> repos = repoRepo.findAll();
         for (GitLabRepository repo : repos) {
             DistrictState district = cityState.getDistricts().get(repo.getSlug());
             if (district != null) {
-                district.setOpenMrCount(repo.getOpenMrs());
+                // Compute from poll_events table
+                int freshCount = (int) pollEventRepository.countOpenMrs(repo.getSlug());
+                district.setOpenMrCount(freshCount);
             }
         }
-        log.debug("Open MR counts refreshed from DB: {} total open MRs",
+        log.debug("Open MR counts refreshed from poll_events: {} total open MRs",
                 cityState.getDistricts().values().stream().mapToInt(DistrictState::getOpenMrCount).sum());
     }
 

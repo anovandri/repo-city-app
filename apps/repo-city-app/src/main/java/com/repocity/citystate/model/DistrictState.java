@@ -1,6 +1,5 @@
 package com.repocity.citystate.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.repocity.identity.domain.RepoStatus;
 import lombok.Getter;
 
@@ -41,14 +40,12 @@ public class DistrictState {
 
     /**
      * Count of currently open merge requests.
-     * Incremented on MR_OPENED, decremented (floor 0) on MR_MERGED.
+     * Incremented on MR_OPENED, decremented on MR_MERGED.
      *
-     * <p>Excluded from snapshot serialization ({@code @JsonIgnore}) because the DB
-     * column {@code gitlab_repositories.open_mrs} is the single source of truth.
-     * The value is always re-synced from the DB after restore and after each poll
-     * cycle via {@link com.repocity.citystate.CityStateService#refreshOpenMrCountsFromDb()}.
+     * <p>This count is now included in snapshot serialization as part of the
+     * refactoring to make memory the single source of truth. Previously excluded
+     * via {@code @JsonIgnore}, but snapshots must now be self-contained.
      */
-    @JsonIgnore
     private int openMrCount;
 
     /** Current CI pipeline status. */
@@ -99,9 +96,9 @@ public class DistrictState {
     }
 
     /**
-     * Overrides the open MR count with the authoritative value from
-     * {@link com.repocity.identity.domain.GitLabRepository#getOpenMrs()}.
-     * Called after each poll cycle to keep this counter in sync with the DB
+     * Overrides the open MR count with the authoritative value computed from
+     * the poll_events table (Phase 1.2: memory is single source of truth).
+     * Called periodically to refresh the count based on actual event data
      * instead of relying solely on incremental MR_OPENED/MR_MERGED deltas.
      */
     public void setOpenMrCount(int openMrCount) {

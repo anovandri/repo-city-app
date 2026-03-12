@@ -1,5 +1,8 @@
 package com.repocity.api;
 
+import com.repocity.citystate.CityStateService;
+import com.repocity.citystate.model.CityState;
+import com.repocity.citystate.model.DistrictState;
 import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.repository.PollEventRepository;
@@ -25,13 +28,16 @@ public class RepoController {
     private final RepoRepository        repoRepository;
     private final PollEventRepository   pollEventRepository;
     private final GitlabUserRepository  gitlabUserRepository;
+    private final CityStateService      cityStateService;
 
     public RepoController(RepoRepository repoRepository,
                           PollEventRepository pollEventRepository,
-                          GitlabUserRepository gitlabUserRepository) {
+                          GitlabUserRepository gitlabUserRepository,
+                          CityStateService cityStateService) {
         this.repoRepository       = repoRepository;
         this.pollEventRepository  = pollEventRepository;
         this.gitlabUserRepository = gitlabUserRepository;
+        this.cityStateService     = cityStateService;
     }
 
     /**
@@ -53,14 +59,21 @@ public class RepoController {
      */
     @GetMapping("/repos")
     public ResponseEntity<List<RepoSummary>> listRepos() {
+        // Phase 4: Read from memory (single source of truth) instead of DB
+        CityState cityState = cityStateService.getCityState();
+        
         List<RepoSummary> body = repoRepository.findAll().stream()
                 .map(repo -> {
+                    // Get live openMrCount from memory (authoritative source)
+                    DistrictState district = cityState.getDistricts().get(repo.getSlug());
+                    int openMrCount = (district != null) ? district.getOpenMrCount() : 0;
+                    
                     String mrListUrl = resolveMrListUrl(repo.getSlug());
                     return new RepoSummary(
                             repo.getSlug(),
                             repo.getName(),
                             repo.getIcon(),
-                            repo.getOpenMrs(),
+                            openMrCount,  // From memory, not DB
                             repo.getStatus(),
                             repo.getDistrict(),
                             repo.getFloors(),

@@ -21,8 +21,26 @@ public interface PollEventRepository extends JpaRepository<PollEvent, Long> {
     boolean existsByEventTypeAndRepoSlugAndGitlabIid(EventType eventType, String repoSlug, Long gitlabIid);
 
     /**
+     * Check if a pipeline with the same ID and status already exists.
+     * Used to avoid duplicate pipeline state entries (e.g., multiple "success" entries for the same pipeline).
+     * Extracts status from JSON payload: {"status":"running"} / {"status":"success"} / {"status":"failed"}
+     */
+    @Query("""
+            SELECT CASE WHEN COUNT(p) > 0 THEN TRUE ELSE FALSE END
+            FROM PollEvent p
+            WHERE p.eventType = 'PIPELINE'
+              AND p.repoSlug = :repoSlug
+              AND p.gitlabIid = :pipelineId
+              AND p.payload LIKE CONCAT('%"status":"', :status, '"%')
+            """)
+    boolean existsPipelineWithStatus(@Param("repoSlug") String repoSlug, 
+                                     @Param("pipelineId") Long pipelineId,
+                                     @Param("status") String status);
+
+    /**
      * Count of distinct open MR iids for a repo that have NOT yet appeared as MR_MERGED.
-     * Used to keep {@code gitlab_repositories.open_mrs} accurate after each poll.
+     * Phase 3: Used by CityStateService to calculate openMrCount from poll_events (audit log).
+     * No longer writes to database - memory (DistrictState) is authoritative.
      */
     @Query("""
             SELECT COUNT(DISTINCT o.gitlabIid)

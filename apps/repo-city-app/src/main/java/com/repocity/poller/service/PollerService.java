@@ -1,5 +1,6 @@
 package com.repocity.poller.service;
 
+import com.repocity.citystate.event.ImmediatePollRequested;
 import com.repocity.poller.client.GitLabClient;
 import com.repocity.identity.domain.GitLabRepository;
 import com.repocity.poller.domain.PollEvent;
@@ -112,9 +113,9 @@ public class PollerService {
         // Wait for all virtual threads to finish before the next cycle
         for (Future<?> f : futures) {
             try {
-                f.get(25, TimeUnit.SECONDS);
+                f.get(60, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                log.warn("Poll task timed out");
+                log.warn("Poll task timed out after 60 seconds");
                 f.cancel(true);
             } catch (Exception e) {
                 log.error("Poll task failed: {}", e.getMessage());
@@ -125,9 +126,67 @@ public class PollerService {
         dispatcher.publishCycleCompleted(new ArrayList<>(cycleEvents));
     }
 
+    /**
+     * Phase 5: Event listener for immediate poll requests from CityStateService.
+     * This event-based approach eliminates the circular dependency that existed
+     * when CityStateService directly called this method via @Lazy injection.
+     *
+     * @param event The immediate poll request with reason
+     */
+    @EventListener
+    public void onImmediatePollRequested(ImmediatePollRequested event) {
+        log.info("Immediate poll requested: {}", event.getReason());
+        performImmediatePoll();
+    }
+
+    /**
+     * Performs an immediate poll of all repositories.
+     * Used during bootstrap when no snapshot exists or snapshot is stale.
+     * Blocks until all polls complete.
+     *
+     * <p>Phase 5: Now invoked via event listener instead of direct call from CityStateService.
+     */
+    public void performImmediatePoll() {
+        log.info("Performing immediate poll for bootstrap");
+
+        List<GitLabRepository> repos = repoRepo.findAll();
+        if (repos.isEmpty()) {
+            log.warn("No repositories to poll");
+            return;
+        }
+
+        cycleEvents.clear();
+
+        // Poll all repos concurrently using virtual threads
+        List<Future<?>> futures = repos.stream()
+                .<Future<?>>map(repo -> vtExecutor.submit(() -> pollRepo(repo, null)))
+                .toList();
+
+        // Wait for all to complete
+        for (Future<?> f : futures) {
+            try {
+                f.get(60, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                log.warn("Immediate poll task timed out after 60 seconds");
+                f.cancel(true);
+            } catch (Exception e) {
+                log.error("Immediate poll task failed: {}", e.getMessage());
+            }
+        }
+
+        // Update lastPoll timestamp
+        lastPoll = Instant.now();
+
+        // Dispatch events to CityStateService
+        dispatcher.publishCycleCompleted(new ArrayList<>(cycleEvents));
+
+        log.info("Immediate poll completed: {} events", cycleEvents.size());
+    }
+
     private void pollRepo(GitLabRepository repo, Instant since) {
         String slug      = repo.getSlug();
         long   projectId = repo.getGitlabProjectId();
+        log.debug("Starting poll for repo: {}", slug);
         try {
             // Commits
             String commits = gitLabClient.fetchCommits(projectId, since);
@@ -141,18 +200,14 @@ public class PollerService {
             String mergedMrs = gitLabClient.fetchMergeRequests(projectId, "merged");
             cycleEvents.addAll(dispatcher.dispatchMergeRequests(slug, mergedMrs, EventType.MR_MERGED));
 
-            // Refresh the open MR count: opened iids that have NOT been merged yet.
-            int freshOpenMrs = (int) pollEventRepo.countOpenMrs(slug);
-            if (repo.getOpenMrs() != freshOpenMrs) {
-                repo.setOpenMrs(freshOpenMrs);
-                repoRepo.save(repo);
-                log.debug("Updated open_mrs for {} → {}", slug, freshOpenMrs);
-            }
+            // Note: open MR count is computed on-demand by CityStateService from poll_events table.
+            // We no longer update the DB column as part of Phase 1.2 refactoring.
 
             // Pipelines
             String pipelines = gitLabClient.fetchPipelines(projectId, since);
             cycleEvents.addAll(dispatcher.dispatchPipelines(slug, pipelines));
 
+            log.debug("Completed poll for repo: {}", slug);
         } catch (Exception e) {
             log.error("Error polling repo {}: {}", slug, e.getMessage());
         }

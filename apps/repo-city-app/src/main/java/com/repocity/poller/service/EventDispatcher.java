@@ -69,9 +69,11 @@ public class EventDispatcher {
 
     @Transactional
     public List<PollEvent> dispatchPipelines(String repoSlug, String json) {
-        // Pipelines carry a numeric id — deduplicate.
+        // Pipelines carry a numeric id.
+        // Unlike MRs, pipelines transition through multiple states (running → success/failed),
+        // so we deduplicate by checking BOTH pipeline ID and status to avoid duplicate state entries.
         // user.username is the canonical GitLab username; may be null for scheduled pipelines.
-        return dispatch(repoSlug, json, EventType.PIPELINE, "user", "id", true, false);
+        return dispatchPipelinesWithStateDedup(repoSlug, json);
     }
 
     /**
@@ -134,6 +136,51 @@ public class EventDispatcher {
             }
         } catch (Exception e) {
             log.error("Failed to dispatch {} events for {}: {}", type, repoSlug, e.getMessage());
+        }
+        return saved;
+    }
+
+    /**
+     * Dedicated pipeline dispatch method that deduplicates by BOTH pipeline ID and status.
+     * Pipelines transition through multiple states (running → success/failed), and we want
+     * to capture each state transition, but avoid storing duplicate entries for the same state.
+     */
+    private List<PollEvent> dispatchPipelinesWithStateDedup(String repoSlug, String json) {
+        List<PollEvent> saved = new ArrayList<>();
+        try {
+            JsonNode array = mapper.readTree(json);
+            if (!array.isArray()) return saved;
+
+            int skipped = 0;
+
+            for (JsonNode node : array) {
+                Long pipelineId = extractLong(node, "id");
+                String status = extractText(node, "status");
+                
+                // Skip if this exact pipeline ID + status combination already exists
+                if (pipelineId != null && status != null
+                        && eventRepo.existsPipelineWithStatus(repoSlug, pipelineId, status)) {
+                    skipped++;
+                    continue;
+                }
+
+                String rawAuthor = extractAuthor(node, "user");
+                String payload = truncate(node.toString());
+
+                PollEvent event = new PollEvent(EventType.PIPELINE, repoSlug, rawAuthor, payload);
+                event.setGitlabIid(pipelineId);
+                saved.add(eventRepo.save(event));
+            }
+
+            if (!saved.isEmpty()) {
+                log.info("Dispatched {} new PIPELINE event(s) for {} ({} duplicate(s) skipped)",
+                         saved.size(), repoSlug, skipped);
+            } else if (skipped > 0) {
+                log.debug("All {} PIPELINE event(s) for {} already stored — skipped",
+                          skipped, repoSlug);
+            }
+        } catch (Exception e) {
+            log.error("Failed to dispatch PIPELINE events for {}: {}", repoSlug, e.getMessage());
         }
         return saved;
     }

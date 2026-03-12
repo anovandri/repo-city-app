@@ -48,7 +48,7 @@ class PollerServiceTest {
         when(gitLabClient.fetchCommits(anyLong(), any())).thenReturn("[]");
         when(gitLabClient.fetchMergeRequests(anyLong(), any())).thenReturn("[]");
         when(gitLabClient.fetchPipelines(anyLong(), any())).thenReturn("[]");
-        when(pollEventRepo.countOpenMrs(any())).thenReturn(0L);
+        // Phase 1.2: removed countOpenMrs stubbing - no longer called in PollerService
 
         pollerService.pollAll();
 
@@ -65,7 +65,7 @@ class PollerServiceTest {
         when(gitLabClient.fetchMergeRequests(anyLong(), eq("opened"))).thenReturn("[]");
         when(gitLabClient.fetchMergeRequests(anyLong(), eq("merged"))).thenReturn("[]");
         when(gitLabClient.fetchPipelines(anyLong(), any())).thenReturn("[]");
-        when(pollEventRepo.countOpenMrs(any())).thenReturn(0L);
+        // Phase 1.2: removed countOpenMrs stubbing - no longer called in PollerService
 
         pollerService.pollAll();
 

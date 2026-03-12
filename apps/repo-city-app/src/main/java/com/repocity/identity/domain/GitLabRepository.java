@@ -39,14 +39,10 @@ public class GitLabRepository {
     @Column(length = 8)
     private String icon;
 
-    /** Cached count of open MRs from the last poll. */
-    @Column(name = "open_mrs")
-    private int openMrs;
-
     /**
      * Base building height expressed as a floor count.
      * The frontend uses this directly to scale the 3-D geometry; it does NOT
-     * derive height from {@code openMrs} so that the visual baseline is stable
+     * derive height from open MR count so that the visual baseline is stable
      * and only changes when a human intentionally edits the seed data.
      * <p>
      * Recommended range: 4 (small utility service) – 14 (EOC / critical platform).
@@ -83,13 +79,12 @@ public class GitLabRepository {
     private RepoStatus status;
 
     public GitLabRepository(String slug, String name, Long gitlabProjectId,
-                            String icon, int openMrs, RepoStatus status,
+                            String icon, RepoStatus status,
                             String district, int floors) {
         this.slug            = slug;
         this.name            = name;
         this.gitlabProjectId = gitlabProjectId;
         this.icon            = icon;
-        this.openMrs         = openMrs;
         this.status          = status;
         this.district        = district;
         this.floors          = floors;

@@ -53,7 +53,7 @@ class RepoRepositoryTest {
 
         assertThat(repo).isPresent();
         assertThat(repo.get().getIcon()).isEqualTo("👤");
-        assertThat(repo.get().getOpenMrs()).isEqualTo(4);
+        // Phase 1.2: openMrs removed from entity, count is computed from poll_events
         assertThat(repo.get().getGitlabProjectId()).isEqualTo(35828382L);
     }
 
@@ -78,17 +78,17 @@ class RepoRepositoryTest {
     void partnerTransaction_hasHighestOpenMrs() {
         Optional<GitLabRepository> repo = repoRepo.findBySlug("ms-partner-transaction");
         assertThat(repo).isPresent();
-        assertThat(repo.get().getOpenMrs()).isEqualTo(6);
+        // Phase 1.2: openMrs removed from entity. Test removed; count is now computed from poll_events.
     }
 
     @Test
     void saveAndRetrieve_newRepo() {
+        // Phase 1.2: removed openMrs parameter from constructor
         GitLabRepository newRepo = new GitLabRepository(
                 "ms-new-service",
                 "ms-new-service",
                 99999999L,
                 "🆕",
-                0,
                 com.repocity.identity.domain.RepoStatus.ACTIVE,
                 "standalone",
                 7);

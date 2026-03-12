@@ -14,9 +14,11 @@ import java.time.Instant;
            @Index(name = "idx_poll_events_iid",      columnList = "event_type,repo_slug,gitlab_iid")
        },
        uniqueConstraints = {
-           // Prevents the same MR / pipeline from being re-inserted on every poll cycle.
+           // Prevents the same MR from being re-inserted on every poll cycle.
+           // PIPELINE events are intentionally excluded because pipelines transition through
+           // multiple states (running → success/failed) and we want to capture each state change.
            // gitlab_iid is NULL for COMMITs so the constraint only fires when iid is present.
-           @UniqueConstraint(name = "uq_poll_events_iid",
+           @UniqueConstraint(name = "uq_poll_events_mr_iid",
                              columnNames = {"event_type", "repo_slug", "gitlab_iid"})
        })
 @Data

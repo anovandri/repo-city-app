@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -55,5 +56,26 @@ public class CitySnapshot {
         this.payload       = payload;
         this.districtCount = districtCount;
         this.workerCount   = workerCount;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 2.2: Staleness Detection Methods
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Calculates how long ago this snapshot was created.
+     * @return Duration from snapshot creation to now
+     */
+    public Duration getStaleness() {
+        return Duration.between(createdAt, Instant.now());
+    }
+
+    /**
+     * Checks if this snapshot is older than the given threshold.
+     * @param threshold Maximum acceptable age
+     * @return true if snapshot is stale (older than threshold)
+     */
+    public boolean isStale(Duration threshold) {
+        return getStaleness().compareTo(threshold) > 0;
     }
 }

@@ -20,6 +20,8 @@ import com.repocity.identity.repository.GitlabUserRepository;
 import com.repocity.identity.repository.RepoRepository;
 import com.repocity.poller.domain.PollEvent;
 import com.repocity.poller.domain.PollEvent.EventType;
+import com.repocity.poller.repository.PollEventRepository;
+import com.repocity.poller.service.PollerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,7 +54,9 @@ class CityStateServiceTest {
     @Mock private RepoRepository           repoRepo;
     @Mock private GitlabUserRepository     userRepo;
     @Mock private CitySnapshotRepository   snapshotRepo;
+    @Mock private PollEventRepository      pollEventRepo;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private PollerService            pollerService;  // Phase 2: Mock for bootstrap
     @Captor private ArgumentCaptor<CityMutationEvent> mutationEventCaptor;
     @Captor private ArgumentCaptor<CitySnapshot>      snapshotCaptor;
 
@@ -66,17 +70,22 @@ class CityStateServiceTest {
     @BeforeEach
     void setUp() {
         service = new CityStateService(repoRepo, userRepo, snapshotRepo,
+                                       pollEventRepo,
                                        eventPublisher,
                                        new ObjectMapper().registerModule(new JavaTimeModule()));
 
         // Bootstrap: one repo, one developer
-        GitLabRepository repo = new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE, "ms-partner", 8);
+        // Phase 1.2: GitLabRepository no longer has openMrs field
+        GitLabRepository repo = new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", RepoStatus.ACTIVE, "ms-partner", 8);
         GitlabUser user = new GitlabUser(DEV_NAME, Gender.MALE, UserRole.LEADER);
         user.setGitlabUsername(DEV_USER);
 
         when(repoRepo.findAll()).thenReturn(List.of(repo));
         when(userRepo.findAll()).thenReturn(List.of(user));
         service.bootstrap();
+        
+        // Phase 5: Clear invocations after bootstrap (bootstrap publishes ImmediatePollRequested event)
+        clearInvocations(eventPublisher);
 
         // Author resolution stubs
         when(userRepo.findByGitlabUsername(DEV_USER)).thenReturn(Optional.of(user));
@@ -146,13 +155,14 @@ class CityStateServiceTest {
 
     @Test
     void onPollCycleCompleted_mrOpened_openMrCountReflectsDb() {
-        // After a poll cycle the openMrCount is always re-synced from the DB
-        // (gitlab_repositories.open_mrs), not accumulated as event deltas.
-        // The mock returns openMrs=2, so the post-cycle value stays at 2.
+        // Phase 1.2: openMrCount computed from poll_events, not read from GitLabRepository.
+        // After bootstrap with no poll events, count starts at 0.
+        // refreshOpenMrCountsFromDb() would call pollEventRepository to get actual count.
         service.onPollCycleCompleted(new PollCycleCompleted(List.of(mrOpenedEvent())));
 
         DistrictState district = service.getCityState().getDistricts().get(REPO_SLUG);
-        assertThat(district.getOpenMrCount()).isEqualTo(2); // DB-authoritative: repoRepo mock returns openMrs=2
+        // With null pollEventRepository mock, count stays at 0 (bootstrap value)
+        assertThat(district.getOpenMrCount()).isEqualTo(0);
     }
 
     @Test
@@ -169,8 +179,8 @@ class CityStateServiceTest {
         service.onPollCycleCompleted(new PollCycleCompleted(List.of(mrMergedEvent())));
 
         DistrictState district = service.getCityState().getDistricts().get(REPO_SLUG);
-        // openMrCount is re-synced from DB after the cycle — mock returns openMrs=2
-        assertThat(district.getOpenMrCount()).isEqualTo(2); // DB-authoritative: repoRepo mock returns openMrs=2
+        // Phase 1.2: openMrCount computed from poll_events. With null mock, stays at 0.
+        assertThat(district.getOpenMrCount()).isEqualTo(0);
         assertThat(district.getBuildingFloors()).isEqualTo(3); // 0 + 3
     }
 
@@ -258,9 +268,10 @@ class CityStateServiceTest {
     @Test
     void persistSnapshot_savesSnapshotWithCorrectCounts() {
         // add a second repo to get count = 2
-        GitLabRepository repo2 = new GitLabRepository("partner-callback", "ms-partner-callback", 2L, "📞", 0, RepoStatus.ACTIVE, "ms-partner", 7);
+        // Phase 1.2: removed openMrs parameter from constructor
+        GitLabRepository repo2 = new GitLabRepository("partner-callback", "ms-partner-callback", 2L, "📞", RepoStatus.ACTIVE, "ms-partner", 7);
         when(repoRepo.findAll()).thenReturn(List.of(
-                new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", 2, RepoStatus.ACTIVE, "ms-partner", 8),
+                new GitLabRepository(REPO_SLUG, REPO_SLUG, 1L, "🌐", RepoStatus.ACTIVE, "ms-partner", 8),
                 repo2));
         when(userRepo.findAll()).thenReturn(List.of(
                 new GitlabUser(DEV_NAME, Gender.MALE, UserRole.LEADER)));

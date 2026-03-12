@@ -134,8 +134,8 @@ class CityStateServiceIntegrationTest {
                 event(EventType.MR_OPENED, "ms-partner-callback", "@anovandri",
                       "{\"iid\":99,\"state\":\"opened\",\"author\":{\"username\":\"@anovandri\"}}"))));
 
-        // openMrCount is re-synced from gitlab_repositories.open_mrs after every poll cycle,
-        // so the post-cycle value equals the DB-seeded value (mrsBefore), not mrsBefore+1.
+        // Phase 3: openMrCount is re-calculated from poll_events after every poll cycle.
+        // The count reflects distinct opened MRs not yet merged in the audit log.
         assertThat(district.getOpenMrCount()).isEqualTo(mrsBefore);
         assertThat(collector.received).hasSize(1);
         assertThat(collector.received.get(0).getMutations().get(0).getAnimationHint())
@@ -154,8 +154,8 @@ class CityStateServiceIntegrationTest {
                 event(EventType.MR_MERGED, "ms-partner-transaction", "@anovandri",
                       "{\"iid\":5,\"state\":\"merged\",\"author\":{\"username\":\"@anovandri\"}}"))));
 
-        // openMrCount is re-synced from gitlab_repositories.open_mrs after every poll cycle,
-        // so the post-cycle value equals the DB-seeded value (mrsBefore), not mrsBefore-1.
+        // Phase 3: openMrCount is re-calculated from poll_events after every poll cycle.
+        // The count reflects distinct opened MRs not yet merged in the audit log.
         assertThat(district.getOpenMrCount()).isEqualTo(mrsBefore);
         assertThat(district.getBuildingFloors()).isEqualTo(floorsBefore + 3);
 
