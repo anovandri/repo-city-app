@@ -478,7 +478,7 @@ html, body, #root {
   flex-direction: column;
   max-height: 400px;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: hidden; /* Horizontal scroll handled per line in .af-text */
 }
 
 /* Custom scrollbar styling */
@@ -524,16 +524,14 @@ html, body, #root {
   border-left-color: rgba(138, 173, 204, 0.35);
 }
 
-/* Phase: complete → flash then fade out */
-.af-line-complete {
-  animation: afComplete 2.2s ease forwards;
+/* Phase: typing → active state */
+.af-line-typing {
+  border-left-width: 2px;
 }
 
-@keyframes afComplete {
-  0%   { background: rgba(80, 160, 255, 0.08); }
-  15%  { background: rgba(80, 160, 255, 0.22); }
-  60%  { background: rgba(80, 160, 255, 0.06); }
-  100% { opacity: 0; }
+/* Phase: done → line stays visible permanently (no fade-out) */
+.af-line-done {
+  opacity: 1;
 }
 
 /* ── Per-event-type accent colours ─── */

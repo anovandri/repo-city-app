@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * ActivityFeed — terminal-style top-right ticker.
+ * ActivityFeed — terminal-style persistent activity log.
  *
- * Each incoming event goes through three phases:
+ * Each incoming event goes through two phases:
  *   1. "walking"  — developer is en-route (shows "waiting for developer...")
  *   2. "typing"   — beam fired; line types itself out character by character
- *   3. "complete" — line flashes then fades out
+ *   3. "done"     — typing complete, line stays visible permanently
+ *
+ * Lines are NEVER removed automatically. Max 25 lines are kept (oldest deleted).
+ * Both vertical and horizontal scrolling enabled.
  *
  * External API (via feedRef):
  *   const id = feedRef.current.push(event)   — add a new line, returns id
@@ -14,8 +17,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
  */
 
 const TYPE_SPEED_MS  = 28;   // ms per character
-const COMPLETE_LINGER = 2200; // ms to linger after complete flash
-const MAX_LINES      = 25;   // limit to 25 rows as requested
+const MAX_LINES      = 25;   // limit to 25 rows, oldest removed when exceeded
 
 // Event-type → accent colour class
 const TYPE_CLASS = {
@@ -50,13 +52,34 @@ let _feedId = 0;
 
 export function ActivityFeed({ feedRef }) {
   const [lines, setLines]     = useState([]);
-  const linesRef              = useRef(lines);
   const timersRef             = useRef({});
+  const bodyRef               = useRef(null);
 
-  // Keep linesRef in sync with lines state for access in callbacks
+  // Auto-scroll to bottom when new lines are added
   useEffect(() => {
-    linesRef.current = lines;
-  }, [lines]);
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [lines.length]);
+
+  // ── startTyping(id, text) → trigger typewriter animation ───────────────
+  const startTyping = useCallback((id, text) => {
+    let charIdx = 0;
+    const type = () => {
+      charIdx++;
+      setLines(prev => prev.map(l =>
+        l.id === id ? { ...l, displayed: text.slice(0, charIdx) } : l
+      ));
+      if (charIdx < text.length) {
+        timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
+      } else {
+        // Typing done → switch to 'done' phase (line stays visible)
+        setLines(prev => prev.map(l => l.id === id ? { ...l, phase: 'done' } : l));
+        delete timersRef.current[`type_${id}`];
+      }
+    };
+    timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
+  }, []);
 
   // ── push(event) → id ─────────────────────────────────────────────────────
   const push = useCallback((event) => {
@@ -71,12 +94,17 @@ export function ActivityFeed({ feedRef }) {
     const repoPart  = event.repoSlug ?? '?';
     const fullText  = `${actorPart} ${verb} ${repoPart}`;
 
+    // Pipeline events skip walking phase (they fire immediately)
+    const isPipelineEvent = event.hint === 'PIPELINE_RUNNING' || 
+                           event.hint === 'PIPELINE_SUCCESS' || 
+                           event.hint === 'PIPELINE_FAILED';
+
     const line = {
       id,
       fullText,
-      displayed: 'waiting for developer...', // Initially shows "waiting"
+      displayed: isPipelineEvent ? '' : 'waiting for developer...', // Pipelines skip waiting text
       typeClass,
-      phase: 'walking', // Start in walking phase (waiting for beam)
+      phase: isPipelineEvent ? 'typing' : 'walking', // Pipelines skip walking phase
       ts: new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' }),
       hint: event.hint,
       repoIcon: event.repoIcon ?? '🏢',
@@ -84,51 +112,39 @@ export function ActivityFeed({ feedRef }) {
 
     setLines(prev => {
       const next = [...prev, line];
+      // Keep only last 25 lines (remove oldest if exceeding)
       return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
     });
+
+    // For pipeline events, immediately start typing (don't wait for complete callback)
+    if (isPipelineEvent) {
+      setTimeout(() => startTyping(id, fullText), 0);
+    }
 
     return id;
   }, []);
 
-  // ── complete(id) → start typing then flash and remove ───────────────────
+  // ── complete(id) → start typing (no fade-out, line stays permanently) ───
   const complete = useCallback((id) => {
-    // Find the line to get its fullText
-    const lineRef = { current: null };
+    let fullText = '';
+    
+    // Switch to typing phase and get the full text
     setLines(prev => {
       const line = prev.find(l => l.id === id);
-      if (line) lineRef.current = line;
-      // Switch to typing phase and clear displayed text
-      return prev.map(l =>
-        l.id === id ? { ...l, phase: 'typing', displayed: '' } : l
-      );
+      if (line) {
+        fullText = line.fullText;
+        return prev.map(l =>
+          l.id === id ? { ...l, phase: 'typing', displayed: '' } : l
+        );
+      }
+      return prev;
     });
 
-    if (!lineRef.current) return;
-
-    const fullText = lineRef.current.fullText;
+    if (!fullText) return; // Line not found
     
     // Start typewriter effect
-    let charIdx = 0;
-    const type = () => {
-      charIdx++;
-      setLines(prev => prev.map(l =>
-        l.id === id ? { ...l, displayed: fullText.slice(0, charIdx) } : l
-      ));
-      if (charIdx < fullText.length) {
-        timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
-      } else {
-        // Typing done → switch to complete phase then remove
-        setLines(prev => prev.map(l => l.id === id ? { ...l, phase: 'complete' } : l));
-        
-        timersRef.current[`done_${id}`] = setTimeout(() => {
-          setLines(prev => prev.filter(l => l.id !== id));
-          delete timersRef.current[`type_${id}`];
-          delete timersRef.current[`done_${id}`];
-        }, COMPLETE_LINGER);
-      }
-    };
-    timersRef.current[`type_${id}`] = setTimeout(type, TYPE_SPEED_MS);
-  }, []);
+    startTyping(id, fullText);
+  }, [startTyping]);
 
   // Expose API via ref
   useEffect(() => {
@@ -153,8 +169,8 @@ export function ActivityFeed({ feedRef }) {
         <span className="af-header-title">activity.log</span>
       </div>
 
-      {/* Lines */}
-      <div className="af-body">
+      {/* Lines - scrollable vertically and horizontally */}
+      <div className="af-body" ref={bodyRef}>
         {lines.map(line => (
           <div
             key={line.id}
@@ -166,19 +182,19 @@ export function ActivityFeed({ feedRef }) {
             {/* Repo icon */}
             <span className="af-repo-icon">{line.repoIcon}</span>
 
-            {/* The typed text */}
+            {/* The typed text - horizontally scrollable */}
             <span className="af-text">
               {line.displayed}
-              {/* Blinking cursor while typing or walking (NOT during complete) */}
-              {line.phase !== 'complete' && (line.phase === 'typing' || line.phase === 'walking') && (
+              {/* Blinking cursor while typing or walking (NOT when done) */}
+              {line.phase !== 'done' && (line.phase === 'typing' || line.phase === 'walking') && (
                 <span className={`af-cursor ${line.phase === 'walking' ? 'af-cursor-walk' : ''}`}>▋</span>
               )}
-              {/* Walking indicator (NOT during complete) */}
-              {line.phase === 'walking' && line.phase !== 'complete' && (
+              {/* Walking indicator */}
+              {line.phase === 'walking' && (
                 <span className="af-walking"> 🚶</span>
               )}
-              {/* Done tick */}
-              {line.phase === 'complete' && (
+              {/* Done tick - shown when typing complete */}
+              {line.phase === 'done' && (
                 <span className="af-done"> ✓</span>
               )}
             </span>

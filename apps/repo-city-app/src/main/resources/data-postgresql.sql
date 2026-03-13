@@ -30,10 +30,12 @@ INSERT INTO gitlab_repositories (slug, name, gitlab_project_id, icon, status, di
   ('partnership-automation',           'partnership-automation',           38539076, '🤝', 'ACTIVE',       'ms-pip',      7),
   -- Maintenance/sunset repo — rendered with ⚠️ "SUNSET SOON" badge
   ('ms-ginpay',                        'ms-ginpay',                        14965852, '⚠️', 'MAINTENANCE',  'ms-pip',      6)
-ON CONFLICT (slug) DO NOTHING;
+ON CONFLICT (slug) DO UPDATE SET
+  district = EXCLUDED.district,
+  status = EXCLUDED.status;
 
 -- ─────────────────────────────────────────────────────────────────
---  Seed: 36 GitLab users
+--  Seed: 37 GitLab users
 -- ─────────────────────────────────────────────────────────────────
 -- gitlab_username matches the GitLab API response format exactly (no @ prefix).
 -- The MR / Pipeline API returns { "author": { "username": "anovandri" } } — no @.
