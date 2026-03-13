@@ -4,6 +4,7 @@ import { HUD }        from './components/HUD.jsx';
 import { MRPanel }    from './components/MRPanel.jsx';
 import { DevPanel }   from './components/DevPanel.jsx';
 import { SimPanel }   from './components/SimPanel.jsx';
+import { LeaderboardPanel } from './components/LeaderboardPanel.jsx';
 import { Toast }        from './components/Toast.jsx';
 import { ActivityFeed } from './components/ActivityFeed.jsx';
 import { useWebSocket }  from './hooks/useWebSocket.js';
@@ -26,6 +27,7 @@ export default function App() {
   const [showMR,  setShowMR]  = useState(false);
   const [showDev, setShowDev] = useState(false);
   const [showSim, setShowSim] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isNightMode, setIsNightMode] = useState(false);
   const [workers, setWorkers] = useState([]);
   // slug → gitlabMrListUrl (populated on mount from /api/repos)
@@ -133,11 +135,48 @@ export default function App() {
       {/* Full-screen Three.js canvas */}
       <CityCanvas sceneRef={sceneRef} onToast={handleToast} onActivity={handleActivity} />
 
+      {/* Day / Night toggle — top-center */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 60,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          onClick={handleToggleDayNight}
+          aria-label={isNightMode ? 'Switch to day mode' : 'Switch to night mode'}
+          title={isNightMode ? 'Day mode' : 'Night mode'}
+          style={{
+            background: 'rgba(0,0,0,0.45)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 12px',
+            fontSize: 14,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
+          }}
+        >
+          <span style={{ fontSize: 16 }}>{isNightMode ? '🌙' : '☀️'}</span>
+          <span style={{ opacity: 0.95 }}>{isNightMode ? 'Night' : 'Day'}</span>
+        </button>
+      </div>
+
       {/* HUD — top-left */}
       <HUD
         stats={stats}
         onOpenMRPanel={() => setShowMR(true)}
         onOpenDevPanel={() => setShowDev(true)}
+        onOpenLeaderboardPanel={() => setShowLeaderboard(true)}
       />
 
       {/* Overlay panels */}
@@ -149,6 +188,7 @@ export default function App() {
           onClose={() => setShowDev(false)}
         />
       )}
+      {showLeaderboard && <LeaderboardPanel onClose={() => setShowLeaderboard(false)} />}
 
       {/* Simulation panel — toggle with Alt+S */}
       {showSim && (

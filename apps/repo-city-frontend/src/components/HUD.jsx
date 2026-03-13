@@ -7,8 +7,9 @@ import React from 'react';
  *   stats         — { repoCount, activeDeveloperCount, totalCommits, openMrCount }
  *   onOpenMRPanel — () => void
  *   onOpenDevPanel— () => void
+ *   onOpenLeaderboardPanel — () => void
  */
-export const HUD = React.memo(function HUD({ stats, onOpenMRPanel, onOpenDevPanel }) {
+export const HUD = React.memo(function HUD({ stats, onOpenMRPanel, onOpenDevPanel, onOpenLeaderboardPanel }) {
   return (
     <div className="hud-panel">
       <div className="hud-title">🏙 Repo City</div>
@@ -27,6 +28,7 @@ export const HUD = React.memo(function HUD({ stats, onOpenMRPanel, onOpenDevPane
       <div className="hud-buttons">
         <button className="hud-btn" onClick={onOpenMRPanel}>🔀 Open MRs</button>
         <button className="hud-btn" onClick={onOpenDevPanel}>👤 Dev Profile</button>
+        <button className="hud-btn" onClick={onOpenLeaderboardPanel}>🏆 City Leaderboard</button>
       </div>
     </div>
   );
