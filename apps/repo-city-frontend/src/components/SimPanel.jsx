@@ -9,6 +9,9 @@ import React, { useEffect, useState, useCallback } from 'react';
  * GitLab activity.
  *
  * Toggle visibility: Alt+S (keyboard shortcut wired in App.jsx)
+ * 
+ * Also includes:
+ * - Camera Follow System: Follow developers around the city
  */
 
 const EVENT_TYPES = [
@@ -193,11 +196,41 @@ const S = {
     border: `1px solid ${ok ? 'rgba(68,255,160,0.2)' : 'rgba(255,60,60,0.2)'}`,
     color: ok ? '#44ffaa' : '#ff6666',
   }),
+  section: {
+    marginTop: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid rgba(100, 180, 255, 0.15)',
+  },
+  sectionTitle: {
+    fontSize: '11px',
+    color: '#88ccff',
+    fontWeight: 700,
+    marginBottom: '8px',
+    letterSpacing: '0.05em',
+  },
+  cameraBtn: (active) => ({
+    width: '100%',
+    padding: '7px',
+    background: active ? 'rgba(255,180,100,0.15)' : 'rgba(255,180,100,0.05)',
+    border: `1px solid ${active ? 'rgba(255,180,100,0.4)' : 'rgba(255,180,100,0.2)'}`,
+    borderRadius: '6px',
+    color: active ? '#ffaa66' : '#aa8866',
+    fontSize: '11px',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    fontWeight: 600,
+    transition: 'all 0.15s',
+    marginBottom: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+  }),
 };
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-export function SimPanel({ onClose, onToggleDayNight, isNightMode }) {
+export function SimPanel({ onClose, onToggleDayNight, isNightMode, sceneRef }) {
   const [repos,        setRepos]        = useState([]);
   const [workers,      setWorkers]      = useState([]);
   const [selectedRepo, setSelectedRepo] = useState('');
@@ -206,6 +239,11 @@ export function SimPanel({ onClose, onToggleDayNight, isNightMode }) {
   const [burstCount,   setBurstCount]   = useState(5);
   const [lastResult,   setLastResult]   = useState(null); // { ok, text }
   const [firing,       setFiring]       = useState(false);
+  
+  // Camera follow state
+  const [cameraMode,      setCameraMode]      = useState('free');
+  const [followedDev,     setFollowedDev]     = useState(null); // Developer name
+  const [availableDevs,   setAvailableDevs]   = useState([]); // List of developer names
 
   // Load repo list and worker list on mount
   useEffect(() => {
@@ -267,6 +305,45 @@ export function SimPanel({ onClose, onToggleDayNight, isNightMode }) {
       setFiring(false);
     }
   }, [burstCount, firing]);
+
+  // Update available developers list
+  useEffect(() => {
+    if (sceneRef?.current?.developerMgr) {
+      const devs = sceneRef.current.developerMgr._devs || [];
+      const devNames = devs
+        .filter(d => d.role !== 'leader') // Exclude leader (seated)
+        .map(d => d.data.name);
+      setAvailableDevs(devNames);
+    }
+  }, [sceneRef]);
+
+  // Camera follow handlers
+  const handleFollowDeveloper = useCallback(() => {
+    if (!sceneRef?.current || !followedDev) return;
+    
+    const { sceneMgr, developerMgr } = sceneRef.current;
+    if (!sceneMgr || !developerMgr) return;
+    
+    // Find developer by name
+    const dev = developerMgr._devs.find(d => d.data.name === followedDev);
+    if (!dev || !dev.group) {
+      setLastResult({ ok: false, text: `✗ Developer "${followedDev}" not found` });
+      return;
+    }
+    
+    sceneMgr.setFollowTarget(dev.group);
+    setCameraMode('follow');
+    setLastResult({ ok: true, text: `📹 Following ${followedDev}` });
+  }, [sceneRef, followedDev]);
+
+  const handleStopFollowing = useCallback(() => {
+    if (!sceneRef?.current?.sceneMgr) return;
+    
+    sceneRef.current.sceneMgr.stopFollowing();
+    setCameraMode('free');
+    setFollowedDev(null);
+    setLastResult({ ok: true, text: '🎮 Free camera mode' });
+  }, [sceneRef]);
 
   return (
     <div style={S.overlay}>
@@ -352,6 +429,55 @@ export function SimPanel({ onClose, onToggleDayNight, isNightMode }) {
       {lastResult && (
         <div style={S.status(lastResult.ok)}>{lastResult.text}</div>
       )}
+
+      {/* Camera Follow Section */}
+      <div style={S.section}>
+        <div style={S.sectionTitle}>📹 Camera Follow</div>
+        
+        {/* Developer selector */}
+        <label style={S.label}>Select Developer</label>
+        <select
+          style={S.select}
+          value={followedDev || ''}
+          onChange={e => setFollowedDev(e.target.value)}
+          disabled={cameraMode === 'follow'}
+        >
+          <option value="">— Choose Developer —</option>
+          {availableDevs.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+
+        {/* Follow button */}
+        {cameraMode !== 'follow' ? (
+          <button
+            style={S.cameraBtn(false)}
+            onClick={handleFollowDeveloper}
+            disabled={!followedDev}
+          >
+            <span>🎥</span>
+            <span>Follow Developer</span>
+          </button>
+        ) : (
+          <button
+            style={S.cameraBtn(true)}
+            onClick={handleStopFollowing}
+          >
+            <span>🎮</span>
+            <span>Stop Following (Free Camera)</span>
+          </button>
+        )}
+
+        {/* Camera mode indicator */}
+        <div style={{ 
+          fontSize: '10px', 
+          color: cameraMode === 'follow' ? '#ffaa66' : '#667788',
+          textAlign: 'center',
+          marginTop: '6px',
+        }}>
+          {cameraMode === 'follow' ? '📹 Following mode active' : '🎮 Free camera mode'}
+        </div>
+      </div>
     </div>
   );
 }

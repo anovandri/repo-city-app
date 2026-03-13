@@ -31,6 +31,7 @@ export class SceneManager {
   get controls() { return this._controls; }
   get isNightMode() { return this._isNightMode; }
   get weatherManager() { return this._weatherManager; }
+  get cameraMode() { return this._cameraMode; }
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -801,6 +802,12 @@ export class SceneManager {
 
   _initWeather() {
     this._weatherManager = new WeatherManager(this._scene, this._camera);
+    
+    // Camera follow system
+    this._cameraMode = 'free'; // 'free', 'follow', 'drone'
+    this._followTarget = null; // Developer group to follow
+    this._followOffset = new THREE.Vector3(5, 8, 5); // Offset behind developer
+    this._cameraLerpSpeed = 0.05; // Smooth interpolation speed
   }
 
   _bindResize() {
@@ -890,6 +897,98 @@ export class SceneManager {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
+  // ── Camera Follow System ─────────────────────────────────────────────────
+
+  /**
+   * Set camera mode
+   * @param {'free' | 'follow' | 'drone'} mode
+   */
+  setCameraMode(mode) {
+    if (!['free', 'follow', 'drone'].includes(mode)) {
+      console.warn(`[SceneManager] Invalid camera mode: ${mode}`);
+      return;
+    }
+    
+    this._cameraMode = mode;
+    
+    // Enable/disable OrbitControls based on mode
+    if (mode === 'free') {
+      this._controls.enabled = true;
+      this._followTarget = null;
+    } else if (mode === 'follow') {
+      this._controls.enabled = false; // Disable manual control when following
+    } else if (mode === 'drone') {
+      this._controls.enabled = false;
+      // TODO: Implement cinematic drone camera
+    }
+    
+    console.log(`[SceneManager] Camera mode: ${mode}`);
+  }
+
+  /**
+   * Set target developer to follow
+   * @param {THREE.Group} developerGroup - The developer's group object
+   */
+  setFollowTarget(developerGroup) {
+    if (!developerGroup) {
+      console.warn('[SceneManager] Invalid follow target');
+      return;
+    }
+    
+    this._followTarget = developerGroup;
+    this._cameraMode = 'follow';
+    this._controls.enabled = false;
+    
+    console.log(`[SceneManager] Following developer at (${developerGroup.position.x.toFixed(1)}, ${developerGroup.position.z.toFixed(1)})`);
+  }
+
+  /**
+   * Stop following and return to free camera
+   */
+  stopFollowing() {
+    this._cameraMode = 'free';
+    this._followTarget = null;
+    this._controls.enabled = true;
+    
+    console.log('[SceneManager] Stopped following, returned to free camera');
+  }
+
+  /**
+   * Update camera position for follow mode
+   * Called in update() loop
+   */
+  _updateFollowCamera() {
+    if (this._cameraMode !== 'follow' || !this._followTarget) return;
+    
+    const target = this._followTarget;
+    const targetPos = target.position;
+    const targetRot = target.rotation.y;
+    
+    // Calculate camera position: behind and above the developer
+    const offset = this._followOffset.clone();
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), targetRot);
+    
+    const desiredCameraPos = new THREE.Vector3(
+      targetPos.x + offset.x,
+      targetPos.y + offset.y,
+      targetPos.z + offset.z
+    );
+    
+    // Smooth camera movement using lerp
+    this._camera.position.lerp(desiredCameraPos, this._cameraLerpSpeed);
+    
+    // Camera looks at developer (slightly ahead for better view)
+    const lookAtPos = new THREE.Vector3(
+      targetPos.x,
+      targetPos.y + 1.0, // Look at head height
+      targetPos.z
+    );
+    this._camera.lookAt(lookAtPos);
+    
+    // Update controls target for smooth transition back to free mode
+    this._controls.target.copy(lookAtPos);
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   update(delta) {
@@ -904,6 +1003,9 @@ export class SceneManager {
     if (this._weatherManager) {
       this._weatherManager.update(delta);
     }
+    
+    // Update camera for follow mode
+    this._updateFollowCamera();
   }
 
   render() {

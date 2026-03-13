@@ -242,6 +242,7 @@ export default function App() {
           onClose={() => setShowSim(false)}
           onToggleDayNight={handleToggleDayNight}
           isNightMode={isNightMode}
+          sceneRef={sceneRef}
         />
       )}
 
