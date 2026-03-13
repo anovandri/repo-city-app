@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { WeatherManager } from './WeatherManager.js';
 
 /**
  * SceneManager — owns the Three.js renderer, camera, CSS2D renderer,
@@ -17,6 +18,7 @@ export class SceneManager {
     this._initLights();
     this._initEnvironment();
     this._initControls();
+    this._initWeather();
     this._bindResize();
   }
 
@@ -28,6 +30,7 @@ export class SceneManager {
   get css2d()    { return this._css2d; }
   get controls() { return this._controls; }
   get isNightMode() { return this._isNightMode; }
+  get weatherManager() { return this._weatherManager; }
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -796,6 +799,10 @@ export class SceneManager {
     this._controls.dampingFactor = 0.07;
   }
 
+  _initWeather() {
+    this._weatherManager = new WeatherManager(this._scene, this._camera);
+  }
+
   _bindResize() {
     this._onResize = () => {
       const w = this._canvas.clientWidth;
@@ -892,6 +899,11 @@ export class SceneManager {
         obj.rotation.y += delta * 0.3; // Slow rotation for water effect
       }
     });
+    
+    // Update weather effects
+    if (this._weatherManager) {
+      this._weatherManager.update(delta);
+    }
   }
 
   render() {
@@ -908,6 +920,9 @@ export class SceneManager {
     this._renderer.dispose();
     if (this._css2d.domElement.parentElement) {
       this._css2d.domElement.parentElement.removeChild(this._css2d.domElement);
+    }
+    if (this._weatherManager) {
+      this._weatherManager.dispose();
     }
     this._scene.traverse(obj => {
       if (obj.geometry) obj.geometry.dispose();

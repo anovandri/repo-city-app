@@ -29,6 +29,7 @@ export default function App() {
   const [showSim, setShowSim] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isNightMode, setIsNightMode] = useState(false);
+  const [currentWeather, setCurrentWeather] = useState('sunny');
   const [workers, setWorkers] = useState([]);
   // slug → gitlabMrListUrl (populated on mount from /api/repos)
   const [mrListUrls, setMrListUrls] = useState({});
@@ -130,12 +131,24 @@ export default function App() {
     });
   }, []);
 
+  // Weather toggle callback - cycle through weather types
+  const handleToggleWeather = useCallback(() => {
+    const weathers = ['sunny', 'cloudy', 'rain', 'fog'];
+    setCurrentWeather(prev => {
+      const currentIndex = weathers.indexOf(prev);
+      const nextIndex = (currentIndex + 1) % weathers.length;
+      const nextWeather = weathers[nextIndex];
+      sceneRef.current?.sceneMgr?.weatherManager?.setWeather(nextWeather);
+      return nextWeather;
+    });
+  }, []);
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* Full-screen Three.js canvas */}
       <CityCanvas sceneRef={sceneRef} onToast={handleToast} onActivity={handleActivity} />
 
-      {/* Day / Night toggle — top-center */}
+      {/* Day / Night and Weather toggle — top-center */}
       <div
         style={{
           position: 'absolute',
@@ -146,8 +159,11 @@ export default function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: 8,
+          pointerEvents: 'none', // Don't block camera controls
         }}
       >
+        {/* Day/Night Button */}
         <button
           onClick={handleToggleDayNight}
           aria-label={isNightMode ? 'Switch to day mode' : 'Switch to night mode'}
@@ -163,11 +179,41 @@ export default function App() {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
+            boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+            pointerEvents: 'auto', // Re-enable pointer events for button
           }}
         >
           <span style={{ fontSize: 16 }}>{isNightMode ? '🌙' : '☀️'}</span>
           <span style={{ opacity: 0.95 }}>{isNightMode ? 'Night' : 'Day'}</span>
+        </button>
+
+        {/* Weather Button */}
+        <button
+          onClick={handleToggleWeather}
+          aria-label="Change weather"
+          title={`Current: ${currentWeather} (click to change)`}
+          style={{
+            background: 'rgba(0,0,0,0.45)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 12px',
+            fontSize: 14,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+            pointerEvents: 'auto', // Re-enable pointer events for button
+          }}
+        >
+          <span style={{ fontSize: 16 }}>
+            {currentWeather === 'sunny' && '☀️'}
+            {currentWeather === 'cloudy' && '☁️'}
+            {currentWeather === 'rain' && '🌧️'}
+            {currentWeather === 'fog' && '🌫️'}
+          </span>
+          <span style={{ opacity: 0.95, textTransform: 'capitalize' }}>{currentWeather}</span>
         </button>
       </div>
 
