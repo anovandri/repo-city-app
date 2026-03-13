@@ -38,7 +38,12 @@ export class SceneManager {
   }
 
   _initRenderers(canvas) {
-    this._renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this._renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: true,
+      powerPreference: 'high-performance', // Performance: GPU optimization
+      stencil: false, // Performance: disable stencil buffer (not used)
+    });
     this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this._renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     this._renderer.shadowMap.enabled = true;
@@ -110,16 +115,16 @@ export class SceneManager {
       return m;
     };
     const cyl = (rt, rb, h, color, x, y, z) => {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), mat(color));
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 8), mat(color)); // Performance: 16→8 segments
       m.position.set(x, y, z);
-      m.castShadow = true;
+      m.castShadow = false; // Performance: decorations don't need shadows
       s.add(m);
       return m;
     };
     const sphere = (r, color, x, y, z) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), mat(color));
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat(color)); // Performance: 12,8→8,6 segments
       m.position.set(x, y, z);
-      m.castShadow = true;
+      m.castShadow = false; // Performance: decorations don't need shadows
       s.add(m);
       return m;
     };
@@ -172,17 +177,17 @@ export class SceneManager {
       // Cart base
       const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.7), mat(0x8b4513));
       base.position.set(0, 0.45, 0);
-      base.castShadow = true;
+      base.castShadow = false; // Performance: small decorations don't need shadows
       g.add(base);
       // Counter top
       const counter = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.75), mat(0xa0522d));
       counter.position.set(0, 0.94, 0);
-      counter.castShadow = true;
+      counter.castShadow = false; // Performance: small decorations don't need shadows
       g.add(counter);
       // Canopy
       const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.9), mat(0xff6b6b));
       canopy.position.set(0, 1.4, 0);
-      canopy.castShadow = true;
+      canopy.castShadow = false; // Performance: small decorations don't need shadows
       g.add(canopy);
       // Canopy poles
       [[-0.55, 0.4], [0.55, 0.4], [-0.55, -0.4], [0.55, -0.4]].forEach(([px, pz]) => {
@@ -219,12 +224,12 @@ export class SceneManager {
       // Base platform
       const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.15), mat(0x999999));
       base.position.set(x, 0.08, z);
-      base.castShadow = true;
+      base.castShadow = false; // Performance: fountain decorations don't need shadows
       s.add(base);
       // Water basin
       const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.9, 0.25), mat(0x8899aa));
       basin.position.set(x, 0.23, z);
-      basin.castShadow = true;
+      basin.castShadow = false; // Performance: fountain decorations don't need shadows
       s.add(basin);
       // Water surface (animated via rotation)
       const waterMat = new THREE.MeshLambertMaterial({ 
@@ -239,12 +244,12 @@ export class SceneManager {
       // Center pillar
       const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.4), mat(0xaaaaaa));
       pillar.position.set(x, 0.55, z);
-      pillar.castShadow = true;
+      pillar.castShadow = false; // Performance: fountain decorations don't need shadows
       s.add(pillar);
       // Top ornament
       const ornament = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), mat(0xcccccc));
       ornament.position.set(x, 0.82, z);
-      ornament.castShadow = true;
+      ornament.castShadow = false; // Performance: fountain decorations don't need shadows
       s.add(ornament);
       // Water jets (small spheres for visual effect)
       for (let i = 0; i < 8; i++) {
@@ -274,7 +279,7 @@ export class SceneManager {
       const rock = new THREE.Mesh(rockGeo, mat(0x777777));
       rock.position.set(x, 0.08 * scale, z);
       rock.rotation.set(Math.random(), Math.random(), Math.random());
-      rock.castShadow = true;
+      rock.castShadow = false; // Performance: small decorations don't need shadows
       s.add(rock);
     };
 

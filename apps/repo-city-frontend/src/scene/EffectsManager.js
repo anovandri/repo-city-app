@@ -163,7 +163,7 @@ export class EffectsManager {
     // Tall tapered cone (narrow top, wide base) rising from the rooftop.
     // AdditiveBlending makes it glow brightly without darkening surroundings.
     const BEAM_H  = 100;
-    const beamGeo = new THREE.CylinderGeometry(0.3, 2.5, BEAM_H, 10, 1, true);
+    const beamGeo = new THREE.CylinderGeometry(0.3, 2.5, BEAM_H, 8, 1, true); // Performance: 10→8 segments
     const beamMat = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -197,7 +197,7 @@ export class EffectsManager {
 
     // Merge burst sphere — expands outward from the rooftop
     if (hint === HINT.MERGE_SUCCESS) {
-      const burstGeo = new THREE.SphereGeometry(2.0, 10, 8);
+      const burstGeo = new THREE.SphereGeometry(2.0, 8, 6); // Performance: 10,8→8,6 segments
       const burstMat = new THREE.MeshBasicMaterial({
         color: 0x66ff88, transparent: true, opacity: 0.5,
         depthWrite: false, blending: THREE.AdditiveBlending, wireframe: true,

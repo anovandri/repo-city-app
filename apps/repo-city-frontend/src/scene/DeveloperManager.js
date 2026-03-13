@@ -321,10 +321,10 @@ export class DeveloperManager {
     const legGeom = this._geo(0.09, 0.18, 0.09);
     const lL = new THREE.Mesh(legGeom, legMat);
     lL.position.set(-0.05, 0.09, 0);
-    lL.castShadow = true;
+    lL.castShadow = false; // Performance: developers don't need shadows
     const lR = new THREE.Mesh(legGeom, legMat);
     lR.position.set( 0.05, 0.09, 0);
-    lR.castShadow = true;
+    lR.castShadow = false; // Performance: developers don't need shadows
     g.add(lL, lR);
 
     // Torso
@@ -332,7 +332,7 @@ export class DeveloperManager {
     const torsoH = isLeader ? 0.22 : 0.2;
     const torso = new THREE.Mesh(this._geo(torsoW, torsoH, 0.11), this._mat(shirtColor));
     torso.position.set(0, 0.28, 0);
-    torso.castShadow = true;
+    torso.castShadow = false; // Performance: developers don't need shadows
     g.add(torso);
 
     // Arms
@@ -340,16 +340,16 @@ export class DeveloperManager {
     const armGeom = this._geo(0.07, 0.17, 0.07);
     const aL = new THREE.Mesh(armGeom, armMat);
     aL.position.set(-0.14, 0.27, 0);
-    aL.castShadow = true;
+    aL.castShadow = false; // Performance: developers don't need shadows
     const aR = new THREE.Mesh(armGeom, armMat);
     aR.position.set( 0.14, 0.27, 0);
-    aR.castShadow = true;
+    aR.castShadow = false; // Performance: developers don't need shadows
     g.add(aL, aR);
 
     // Head
     const head = new THREE.Mesh(this._geo(0.17, 0.17, 0.17), this._mat(skinColor));
     head.position.set(0, 0.46, 0);
-    head.castShadow = true;
+    head.castShadow = false; // Performance: developers don't need shadows
     g.add(head);
 
     // Hat / crown
@@ -392,7 +392,7 @@ export class DeveloperManager {
     // Skirt / dress bottom
     const skirt = new THREE.Mesh(this._geo(0.22, 0.2, 0.14), this._mat(legColor));
     skirt.position.set(0, 0.1, 0);
-    skirt.castShadow = true;
+    skirt.castShadow = false; // Performance: developers don't need shadows
     g.add(skirt);
 
     // Shoes
@@ -407,7 +407,7 @@ export class DeveloperManager {
     // Torso
     const torso = new THREE.Mesh(this._geo(0.19, 0.18, 0.10), this._mat(shirtColor));
     torso.position.set(0, 0.29, 0);
-    torso.castShadow = true;
+    torso.castShadow = false; // Performance: developers don't need shadows
     g.add(torso);
 
     // Arms
@@ -415,16 +415,16 @@ export class DeveloperManager {
     const armGeom = this._geo(0.06, 0.15, 0.06);
     const aL = new THREE.Mesh(armGeom, armMat);
     aL.position.set(-0.13, 0.28, 0);
-    aL.castShadow = true;
+    aL.castShadow = false; // Performance: developers don't need shadows
     const aR = new THREE.Mesh(armGeom, armMat);
     aR.position.set( 0.13, 0.28, 0);
-    aR.castShadow = true;
+    aR.castShadow = false; // Performance: developers don't need shadows
     g.add(aL, aR);
 
     // Head
     const head = new THREE.Mesh(this._geo(0.16, 0.16, 0.16), this._mat(skinColor));
     head.position.set(0, 0.46, 0);
-    head.castShadow = true;
+    head.castShadow = false; // Performance: developers don't need shadows
     g.add(head);
 
     // Hair bun + band
