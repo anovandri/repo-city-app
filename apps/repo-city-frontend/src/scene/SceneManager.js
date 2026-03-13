@@ -128,9 +128,15 @@ export class SceneManager {
       s.add(m);
       return m;
     };
+
+    // ── Phase 2: Instanced Meshes - Data Collection ──────────────
+    // Collect instance data for trees, benches, lamps
+    const treeInstances = [];
+    const benchInstances = [];
+    const lampInstances = [];
+    
     const tree = (x, z, h = 1.8, r = 1.1) => {
-      cyl(0.18, 0.22, h, 0x7a5230, x, h / 2, z);
-      sphere(r, 0x2e9e2e, x, h + r * 0.7, z);
+      treeInstances.push({ x, z, h, r });
     };
     const bush = (x, z) => {
       sphere(0.55, 0x3aaa3a, x, 0.4, z);
@@ -138,39 +144,10 @@ export class SceneManager {
       sphere(0.38, 0x36a036, x - 0.35, 0.45, z - 0.1);
     };
     const bench = (x, z, ry = 0) => {
-      const g = new THREE.Group();
-      // seat
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.18), mat(0x8b6914));
-      seat.position.set(0, 0.18, 0);
-      g.add(seat);
-      // backrest
-      const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.04), mat(0x8b6914));
-      back.position.set(0, 0.28, 0.08);
-      g.add(back);
-      // legs
-      [[-0.28, 0], [0.28, 0]].forEach(([lx]) => {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.18), mat(0x666655));
-        leg.position.set(lx, 0.09, 0);
-        g.add(leg);
-      });
-      g.rotation.y = ry;
-      g.position.set(x, 0, z);
-      s.add(g);
+      benchInstances.push({ x, z, ry });
     };
     const lamp = (x, z) => {
-      // Lamp post pole
-      cyl(0.07, 0.09, 3.5, 0x555555, x, 1.75, z);
-      // Lamp arm
-      box(0.6, 0.07, 0.07, 0x555555, x + 0.3, 3.55, z);
-      // Lamp bulb (glowing sphere)
-      const bulb = sphere(0.18, 0xffffcc, x + 0.6, 3.55, z);
-      // Add point light for night illumination
-      const light = new THREE.PointLight(0xffd580, 0, 8, 2); // Start with intensity 0 (day mode)
-      light.position.set(x + 0.6, 3.55, z);
-      light.castShadow = false; // Disable shadows for performance
-      light.userData.isLampLight = true;
-      s.add(light);
-      this._lampLights.push(light); // Store for day/night toggling
+      lampInstances.push({ x, z });
     };
     const coffeeCart = (x, z, ry = 0) => {
       const g = new THREE.Group();
@@ -591,6 +568,222 @@ export class SceneManager {
     s.add(parkAnchor);
     const parkDiv = document.createElement('div');
     parkAnchor.add(new CSS2DObject(parkDiv));
+
+    // ── Phase 2: Create Instanced Meshes ─────────────────────────
+    this._createInstancedTrees(treeInstances);
+    this._createInstancedBenches(benchInstances);
+    this._createInstancedLamps(lampInstances);
+  }
+
+  /**
+   * Performance: Phase 2 - Create instanced tree meshes
+   * Trees consist of trunk (cylinder) + foliage (sphere)
+   */
+  _createInstancedTrees(instances) {
+    if (instances.length === 0) return;
+
+    const s = this._scene;
+    const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+    // Create trunk instanced mesh
+    const trunkGeo = new THREE.CylinderGeometry(0.18, 0.22, 1, 8); // Height=1, will scale per instance
+    const trunkMat = mat(0x7a5230);
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, instances.length);
+    trunkMesh.castShadow = false;
+    trunkMesh.receiveShadow = true;
+
+    // Create foliage instanced mesh
+    const foliageGeo = new THREE.SphereGeometry(1, 8, 6); // Radius=1, will scale per instance
+    const foliageMat = mat(0x2e9e2e);
+    const foliageMesh = new THREE.InstancedMesh(foliageGeo, foliageMat, instances.length);
+    foliageMesh.castShadow = false;
+    foliageMesh.receiveShadow = true;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+
+    instances.forEach((inst, i) => {
+      const { x, z, h, r } = inst;
+
+      // Trunk: scale height, position at half height
+      position.set(x, h / 2, z);
+      rotation.set(0, 0, 0, 1);
+      scale.set(1, h, 1);
+      matrix.compose(position, rotation, scale);
+      trunkMesh.setMatrixAt(i, matrix);
+
+      // Foliage: scale radius, position at top of trunk + offset
+      position.set(x, h + r * 0.7, z);
+      scale.set(r, r, r);
+      matrix.compose(position, rotation, scale);
+      foliageMesh.setMatrixAt(i, matrix);
+    });
+
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    foliageMesh.instanceMatrix.needsUpdate = true;
+
+    s.add(trunkMesh);
+    s.add(foliageMesh);
+
+    console.log(`[SceneManager] Created ${instances.length} instanced trees (${instances.length * 2} meshes → 2 InstancedMeshes)`);
+  }
+
+  /**
+   * Performance: Phase 2 - Create instanced bench meshes
+   * Benches consist of seat, backrest, and 2 legs
+   */
+  _createInstancedBenches(instances) {
+    if (instances.length === 0) return;
+
+    const s = this._scene;
+    const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+    // Create instanced meshes for each bench part
+    const seatGeo = new THREE.BoxGeometry(0.7, 0.05, 0.18);
+    const seatMat = mat(0x8b6914);
+    const seatMesh = new THREE.InstancedMesh(seatGeo, seatMat, instances.length);
+    seatMesh.castShadow = false;
+    seatMesh.receiveShadow = true;
+
+    const backGeo = new THREE.BoxGeometry(0.7, 0.16, 0.04);
+    const backMat = mat(0x8b6914);
+    const backMesh = new THREE.InstancedMesh(backGeo, backMat, instances.length);
+    backMesh.castShadow = false;
+    backMesh.receiveShadow = true;
+
+    const legGeo = new THREE.BoxGeometry(0.05, 0.18, 0.18);
+    const legMat = mat(0x666655);
+    const legMeshL = new THREE.InstancedMesh(legGeo, legMat, instances.length);
+    const legMeshR = new THREE.InstancedMesh(legGeo, legMat, instances.length);
+    legMeshL.castShadow = false;
+    legMeshL.receiveShadow = true;
+    legMeshR.castShadow = false;
+    legMeshR.receiveShadow = true;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+
+    instances.forEach((inst, i) => {
+      const { x, z, ry } = inst;
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+
+      // Seat: position at y=0.18, rotated by ry
+      const seatPos = new THREE.Vector3(0, 0.18, 0);
+      seatPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+      position.set(x + seatPos.x, seatPos.y, z + seatPos.z);
+      matrix.compose(position, rotation, scale);
+      seatMesh.setMatrixAt(i, matrix);
+
+      // Backrest: position at y=0.28, z=0.08 (local), rotated by ry
+      const backPos = new THREE.Vector3(0, 0.28, 0.08);
+      backPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+      position.set(x + backPos.x, backPos.y, z + backPos.z);
+      matrix.compose(position, rotation, scale);
+      backMesh.setMatrixAt(i, matrix);
+
+      // Left leg: position at y=0.09, x=-0.28 (local), rotated by ry
+      const legLPos = new THREE.Vector3(-0.28, 0.09, 0);
+      legLPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+      position.set(x + legLPos.x, legLPos.y, z + legLPos.z);
+      matrix.compose(position, rotation, scale);
+      legMeshL.setMatrixAt(i, matrix);
+
+      // Right leg: position at y=0.09, x=0.28 (local), rotated by ry
+      const legRPos = new THREE.Vector3(0.28, 0.09, 0);
+      legRPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+      position.set(x + legRPos.x, legRPos.y, z + legRPos.z);
+      matrix.compose(position, rotation, scale);
+      legMeshR.setMatrixAt(i, matrix);
+    });
+
+    seatMesh.instanceMatrix.needsUpdate = true;
+    backMesh.instanceMatrix.needsUpdate = true;
+    legMeshL.instanceMatrix.needsUpdate = true;
+    legMeshR.instanceMatrix.needsUpdate = true;
+
+    s.add(seatMesh);
+    s.add(backMesh);
+    s.add(legMeshL);
+    s.add(legMeshR);
+
+    console.log(`[SceneManager] Created ${instances.length} instanced benches (${instances.length * 4} meshes → 4 InstancedMeshes)`);
+  }
+
+  /**
+   * Performance: Phase 2 - Create instanced lamp meshes
+   * Lamps consist of pole, arm, bulb. Lights are created separately for individual control.
+   */
+  _createInstancedLamps(instances) {
+    if (instances.length === 0) return;
+
+    const s = this._scene;
+    const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+    // Create instanced meshes for lamp parts
+    const poleGeo = new THREE.CylinderGeometry(0.07, 0.09, 3.5, 8);
+    const poleMat = mat(0x555555);
+    const poleMesh = new THREE.InstancedMesh(poleGeo, poleMat, instances.length);
+    poleMesh.castShadow = false;
+    poleMesh.receiveShadow = true;
+
+    const armGeo = new THREE.BoxGeometry(0.6, 0.07, 0.07);
+    const armMat = mat(0x555555);
+    const armMesh = new THREE.InstancedMesh(armGeo, armMat, instances.length);
+    armMesh.castShadow = false;
+    armMesh.receiveShadow = true;
+
+    const bulbGeo = new THREE.SphereGeometry(0.18, 8, 6);
+    const bulbMat = mat(0xffffcc);
+    const bulbMesh = new THREE.InstancedMesh(bulbGeo, bulbMat, instances.length);
+    bulbMesh.castShadow = false;
+    bulbMesh.receiveShadow = true;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+
+    instances.forEach((inst, i) => {
+      const { x, z } = inst;
+
+      // Pole: position at y=1.75 (half height of 3.5)
+      position.set(x, 1.75, z);
+      rotation.set(0, 0, 0, 1);
+      matrix.compose(position, rotation, scale);
+      poleMesh.setMatrixAt(i, matrix);
+
+      // Arm: position at y=3.55, x offset by 0.3
+      position.set(x + 0.3, 3.55, z);
+      matrix.compose(position, rotation, scale);
+      armMesh.setMatrixAt(i, matrix);
+
+      // Bulb: position at y=3.55, x offset by 0.6
+      position.set(x + 0.6, 3.55, z);
+      matrix.compose(position, rotation, scale);
+      bulbMesh.setMatrixAt(i, matrix);
+
+      // Create individual point light for night mode control
+      const light = new THREE.PointLight(0xffd580, 0, 8, 2);
+      light.position.set(x + 0.6, 3.55, z);
+      light.castShadow = false;
+      light.userData.isLampLight = true;
+      s.add(light);
+      this._lampLights.push(light);
+    });
+
+    poleMesh.instanceMatrix.needsUpdate = true;
+    armMesh.instanceMatrix.needsUpdate = true;
+    bulbMesh.instanceMatrix.needsUpdate = true;
+
+    s.add(poleMesh);
+    s.add(armMesh);
+    s.add(bulbMesh);
+
+    console.log(`[SceneManager] Created ${instances.length} instanced lamps (${instances.length * 3} meshes → 3 InstancedMeshes)`);
   }
 
   _initControls() {
