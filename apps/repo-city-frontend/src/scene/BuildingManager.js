@@ -251,6 +251,10 @@ export class BuildingManager {
     const repo = this._repoMeta[slug];
     if (!repo) { console.error(`BuildingManager: unknown slug "${slug}"`); return; }
     group.position.set(repo.x, 0, repo.z);
+    
+    // Explicitly set initial scale to (1, 1, 1) to ensure consistent baseline
+    group.scale.set(1, 1, 1);
+    
     this._scene.add(group);
     this._buildings.set(slug, group);
     this._roofY.set(slug, roofY);
