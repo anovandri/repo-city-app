@@ -41,6 +41,7 @@ export const CityCanvas = React.memo(function CityCanvas({ sceneRef, onToast, on
       const buildingMgr  = new BuildingManager(sceneMgr.scene, apiRepos);
       const developerMgr = new DeveloperManager(sceneMgr.scene, apiWorkers);
       developerMgr.setBuildingManager(buildingMgr);
+      developerMgr.setCamera(sceneMgr.camera); // Performance: Phase 5 - Enable frustum culling
       const effectsMgr   = new EffectsManager(sceneMgr.scene, buildingMgr, onToast, developerMgr, onActivity);
       const labelMgr     = new LabelManager(sceneMgr.scene);
 

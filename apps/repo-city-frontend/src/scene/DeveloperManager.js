@@ -59,6 +59,10 @@ export class DeveloperManager {
     this._geoCache    = new Map();
     this._buildingMgr = null;  // set via setBuildingManager() after construction
     this._isNightMode = false; // Night mode state
+    this._camera      = null;  // Performance: Phase 5 - set via setCamera() for frustum culling
+    this._frustum     = new THREE.Frustum(); // Performance: Phase 5 - reused frustum for visibility checks
+    this._frustumMatrix = new THREE.Matrix4(); // Performance: Phase 5 - reused matrix for frustum calculation
+    this._testSphere  = new THREE.Sphere(); // Performance: Phase 5 - reused sphere for position-based culling
 
     // Normalise from API format to internal format.
     // API: { displayName, gitlabUsername, role: 'ENGINEER', gender: 'MALE' }
@@ -78,6 +82,11 @@ export class DeveloperManager {
   /** Inject the BuildingManager so dispatch can find waypoints by building position. */
   setBuildingManager(bm) {
     this._buildingMgr = bm;
+  }
+
+  /** Performance: Phase 5 - Inject camera for frustum culling optimization. */
+  setCamera(camera) {
+    this._camera = camera;
   }
 
   /**
@@ -116,10 +125,32 @@ export class DeveloperManager {
 
   /** Call once per animation frame. @param {number} delta seconds */
   update(delta) {
+    // Performance: Phase 5 - Update frustum from camera for culling
+    if (this._camera) {
+      this._frustumMatrix.multiplyMatrices(
+        this._camera.projectionMatrix,
+        this._camera.matrixWorldInverse
+      );
+      this._frustum.setFromProjectionMatrix(this._frustumMatrix);
+    }
+
     this._devs.forEach(dev => {
       if (dev.role === 'leader') return;
+
+      // Performance: Phase 5 - Only animate developers visible in camera frustum
+      // Use position-based sphere test to avoid bounding box computation overhead
+      let isVisible = true;
+      if (this._camera) {
+        this._testSphere.set(dev.group.position, 1.5); // 1.5 unit radius covers typical developer
+        isVisible = this._frustum.intersectsSphere(this._testSphere);
+      }
+      
       this._walkDev(dev, delta);
-      this._animateLimbs(dev, delta);
+      
+      // Only animate limbs for visible developers
+      if (isVisible) {
+        this._animateLimbs(dev, delta);
+      }
     });
   }
 
