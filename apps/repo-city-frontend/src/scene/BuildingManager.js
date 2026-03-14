@@ -294,19 +294,19 @@ export class BuildingManager {
     const visualFloors = this._scaleFloors(floors);
     const h = visualFloors * 1.2;
     const g = new THREE.Group();
-    this._plane(g, 16, 14, 0x4a7a5a, 0, 0.04, 0);
-    this._box(g, 12.0, h,       9.0, 0x4a6a8a, 0, h/2,       0);
-    this._box(g, 12.4, 0.5,    9.4, 0x334d66, 0, h + 0.25,   0);
-    this._box(g, 12.0, 0.9,    9.0, 0x2a3d55, 0, h + 0.7,    0);
+    this._plane(g, 16, 14, 0x66dd88, 0, 0.04, 0); // Bright green ground
+    this._box(g, 12.0, h,       9.0, 0x5599dd, 0, h/2,       0); // Bright blue building
+    this._box(g, 12.4, 0.5,    9.4, 0x4488cc, 0, h + 0.25,   0); // Accent band
+    this._box(g, 12.0, 0.9,    9.0, 0x3377bb, 0, h + 0.7,    0); // Roof cap
     const wins = [];
     const rows = Math.max(2, Math.floor(floors * 0.6));
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < 4; col++) {
-        wins.push(this._box(g, 1.8, 1.2, 0.2, 0xb8d8ff, -4.5 + col*3.0, 1.2 + row*(h/rows), -4.55));
+        wins.push(this._box(g, 1.8, 1.2, 0.2, 0xffeeaa, -4.5 + col*3.0, 1.2 + row*(h/rows), -4.55)); // Bright yellow windows
       }
     }
     this._box(g, 2.5, 3.5, 0.2, 0x2a3d55, 0, 1.75, -4.55);
-    this._box(g, 13.0, 0.3, 0.3, 0x4a6a8a, 0, 0.3, 0);
+    this._box(g, 13.0, 0.3, 0.3, 0x5599dd, 0, 0.3, 0);
     this._lamp(g, 4, 4); this._lamp(g, -4, 4);
     this._tree(g, -6, -6, 3.5, 2.2); this._tree(g, 6, -6, 3.5, 2.2);
     this._register(g, slug, h + 0.9 + 0.45, 1.2, 0.9 + 0.45); // multiplier=1.2, accessories=1.35
@@ -319,15 +319,15 @@ export class BuildingManager {
     const visualFloors = this._scaleFloors(floors);
     const h = visualFloors * 1.1;
     const g = new THREE.Group();
-    this._plane(g, 14, 12, 0x3a6a5e, 0, 0.04, 0);
-    this._box(g, 9.0, h,    7.5, 0x3a6a7a, 0, h/2,     0);
-    this._box(g, 9.4, 0.4,  7.9, 0x2a4a5a, 0, h + 0.2, 0);
-    this._box(g, 9.0, 0.7,  7.5, 0x1e3a48, 0, h + 0.75,0);
+    this._plane(g, 14, 12, 0x55ddaa, 0, 0.04, 0); // Bright teal ground
+    this._box(g, 9.0, h,    7.5, 0x44aadd, 0, h/2,     0); // Bright cyan building
+    this._box(g, 9.4, 0.4,  7.9, 0x3399cc, 0, h + 0.2, 0); // Accent band
+    this._box(g, 9.0, 0.7,  7.5, 0x2288bb, 0, h + 0.75,0); // Roof cap
     const wins = [];
     const rows = Math.max(2, Math.floor(floors * 0.45));
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < 3; col++) {
-        wins.push(this._box(g, 1.6, 1.3, 0.2, 0xaadeee, -3.0 + col*3.0, 1.2 + row*(h/rows), 3.55));
+        wins.push(this._box(g, 1.6, 1.3, 0.2, 0xffffcc, -3.0 + col*3.0, 1.2 + row*(h/rows), 3.55)); // Bright cream windows
       }
     }
     this._box(g, 2.0, 3.0, 0.2, 0x1e3a48, 0, 1.5, 3.55);
@@ -343,10 +343,10 @@ export class BuildingManager {
     const visualFloors = this._scaleFloors(floors);
     const h = visualFloors * 1.1;
     const g = new THREE.Group();
-    this._plane(g, 14, 12, 0x5a7a4e, 0, 0.04, 0);
-    this._box(g, 8.5, h,    7.0, 0x5a7a6a, 0, h/2,      0);
-    this._box(g, 8.9, 0.4,  7.4, 0x3a5a4a, 0, h + 0.2,  0);
-    this._box(g, 8.5, 0.7,  7.0, 0x2a4a3a, 0, h + 0.75, 0);
+    this._plane(g, 14, 12, 0x88dd66, 0, 0.04, 0); // Bright lime ground
+    this._box(g, 8.5, h,    7.0, 0x66bb55, 0, h/2,      0); // Bright green building
+    this._box(g, 8.9, 0.4,  7.4, 0x55aa44, 0, h + 0.2,  0); // Accent band
+    this._box(g, 8.5, 0.7,  7.0, 0x449933, 0, h + 0.75, 0); // Roof cap
     const wins = [];
     const rows = Math.max(2, Math.floor(floors * 0.55));
     for (let row = 0; row < rows; row++) {
@@ -416,22 +416,22 @@ export class BuildingManager {
     const visualFloors = this._scaleFloors(floors);
     const h = visualFloors * 1.2;
     const g = new THREE.Group();
-    this._plane(g, 14, 14, 0x4a6e7a, 0, 0.04, 0);
-    this._box(g, 9.0, h,    8.0, 0x4a6a8a, 0, h/2,      0);
-    this._box(g, 9.4, 0.45, 8.4, 0x2a4a6a, 0, h + 0.22, 0);
-    this._box(g, 9.0, 0.8,  8.0, 0x1a3a5a, 0, h + 0.85, 0);
+    this._plane(g, 14, 14, 0x66bbee, 0, 0.04, 0); // Bright sky blue ground
+    this._box(g, 9.0, h,    8.0, 0x5588dd, 0, h/2,      0); // Bright purple-blue building
+    this._box(g, 9.4, 0.45, 8.4, 0x4477cc, 0, h + 0.22, 0); // Accent band
+    this._box(g, 9.0, 0.8,  8.0, 0x3366bb, 0, h + 0.85, 0); // Roof cap
     const wins = [];
     const rows = Math.max(2, Math.floor(floors * 0.55));
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < 3; col++) {
-        wins.push(this._box(g, 1.6, 1.2, 0.2, 0xb0d8ff, -2.5 + col*2.5, 1.3 + row*(h/rows), 4.05));
+        wins.push(this._box(g, 1.6, 1.2, 0.2, 0xffffaa, -2.5 + col*2.5, 1.3 + row*(h/rows), 4.05)); // Bright yellow windows
       }
     }
-    this._box(g, 2.0, 3.0, 0.2, 0x1a3a5a, 0, 1.5, 4.05);
-    this._cyl(g, 0.08, 0.1, 0.7, 0x777777,  2.5, h + 0.45, 2.5);
-    this._sphere(g, 0.5, 0xccddee, 2.5, h + 1.15, 2.5);
-    this._cyl(g, 0.08, 0.1, 0.7, 0x777777, -2.5, h + 0.45, -2.5);
-    this._sphere(g, 0.5, 0xccddee, -2.5, h + 1.15, -2.5);
+    this._box(g, 2.0, 3.0, 0.2, 0x3366bb, 0, 1.5, 4.05);
+    this._cyl(g, 0.08, 0.1, 0.7, 0xcccccc,  2.5, h + 0.45, 2.5);
+    this._sphere(g, 0.5, 0xffeeaa, 2.5, h + 1.15, 2.5); // Bright cream sphere
+    this._cyl(g, 0.08, 0.1, 0.7, 0xcccccc, -2.5, h + 0.45, -2.5);
+    this._sphere(g, 0.5, 0xffeeaa, -2.5, h + 1.15, -2.5); // Bright cream sphere
     this._lamp(g, -4, 4); this._lamp(g, 4, 4);
     this._register(g, slug, h + 0.85 + 0.4, 1.2, 1.25); // Gateway: multiplier=1.2, accessories=1.25
     this._windows.set(slug, wins);
@@ -493,29 +493,42 @@ export class BuildingManager {
   _buildTransaction(slug) {
     const { floors } = this._repoMeta[slug];
     const visualFloors = this._scaleFloors(floors);
-    const towerH = visualFloors * 1.6;  // taller proportionally for the tower style
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
-    this._plane(g, 14, 14, 0x4a6a4e, 0, 0.04, 0);
-    this._cyl(g, 3.2, 3.4, 1.0,    0x778877, 0, 0.5,           0);
-    this._cyl(g, 2.2, 2.4, towerH, 0x5a7a5e, 0, 1.0 + towerH/2, 0);
-    const capY = 1.0 + towerH;
-    this._cyl(g, 4.2, 4.2, 0.6,    0x3a5a3e, 0, capY + 0.3,    0);
-    this._cyl(g, 3.6, 3.6, 0.3,    0x4a6a4e, 0, capY + 0.75,   0);
-    this._cyl(g, 0.2, 0.2, 4.0,    0xaaaaaa, 0, capY + 2.9,    0);
-    this._sphere(g, 0.5, 0x44dd44,  0, capY + 5.0, 0);
-    const winRows = Math.max(2, Math.floor(floors * 0.35));
-    for (let ri = 0; ri < winRows; ri++) {
-      [0, 1, 2, 3].forEach(i => {
-        const angle = i * Math.PI / 2;
-        const wx = Math.sin(angle) * 2.3;
-        const wz = Math.cos(angle) * 2.3;
-        this._box(g, 0.8, 0.55, 0.15, 0xaaffaa, wx, 2.0 + ri*(towerH/winRows), wz, angle);
-      });
+    
+    // Bright green ground plane for visibility
+    this._plane(g, 14, 14, 0x66ee88, 0, 0.04, 0);
+    
+    // Main building structure - bright teal/green building
+    this._box(g, 9.5, h, 8.5, 0x44ccaa, 0, h/2, 0); // Bright teal body
+    this._box(g, 9.9, 0.45, 8.9, 0x33bb99, 0, h + 0.22, 0); // Accent band
+    this._box(g, 9.5, 0.8, 8.5, 0x22aa88, 0, h + 0.85, 0); // Roof cap
+    
+    // Windows with bright yellow glow
+    const wins = [];
+    const rows = Math.max(2, Math.floor(floors * 0.5));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < 3; col++) {
+        wins.push(this._box(g, 1.8, 1.3, 0.2, 0xffffaa, -3.0 + col*3.0, 1.3 + row*(h/rows), 4.3));
+      }
     }
-    this._lamp(g, -5, 4); this._lamp(g, 5, 4);
+    
+    // Entrance door
+    this._box(g, 2.2, 3.2, 0.2, 0x22aa88, 0, 1.6, 4.3);
+    
+    // Corner accent pillars
+    this._box(g, 0.6, h, 0.6, 0x55ddbb, -4.5, h/2, -4.0);
+    this._box(g, 0.6, h, 0.6, 0x55ddbb, 4.5, h/2, -4.0);
+    this._box(g, 0.6, h, 0.6, 0x55ddbb, -4.5, h/2, 4.0);
+    this._box(g, 0.6, h, 0.6, 0x55ddbb, 4.5, h/2, 4.0);
+    
+    // Rooftop decorations
+    this._box(g, 2.0, 0.8, 2.0, 0x55ddbb, 0, h + 1.25, 0);
+    
+    this._lamp(g, -5, 5); this._lamp(g, 5, 5);
     this._tree(g, 6, -5, 3.5, 2.2);
-    this._register(g, slug, capY + 5.5, 1.6, 6.5); // Transaction: multiplier=1.6, accessories=6.5
-    this._windows.set(slug, []);
+    this._register(g, slug, h + 1.65, 1.2, 1.65); // Transaction: multiplier=1.2, accessories=1.65
+    this._windows.set(slug, wins);
   }
 
   // ── ms-partner-web ───────────────────────────────────────────────────────
@@ -621,29 +634,43 @@ export class BuildingManager {
   _buildPipTransaction(slug) {
     const { floors } = this._repoMeta[slug];
     const visualFloors = this._scaleFloors(floors);
-    const towerH = visualFloors * 1.5;
+    const h = visualFloors * 1.2;
     const g = new THREE.Group();
-    this._plane(g, 14, 14, 0x7a6a3e, 0, 0.04, 0);
-    this._cyl(g, 3.0, 3.2, 1.0,    0x998855, 0, 0.5,            0);
-    this._cyl(g, 2.0, 2.2, towerH, 0x7a6a4a, 0, 1.0 + towerH/2, 0);
-    const capY = 1.0 + towerH;
-    this._cyl(g, 3.8, 3.8, 0.55,   0x5a4a2a, 0, capY + 0.27,    0);
-    this._cyl(g, 3.2, 3.2, 0.3,    0x6a5a3a, 0, capY + 0.72,    0);
-    this._cyl(g, 0.18, 0.18, 3.5,  0xaaaaaa, 0, capY + 2.55,    0);
-    this._sphere(g, 0.45, 0xffaa22, 0, capY + 4.4, 0);
-    const winRows = Math.max(2, Math.floor(floors * 0.35));
-    for (let ri = 0; ri < winRows; ri++) {
-      [0, 1, 2, 3].forEach(i => {
-        const angle = i * Math.PI / 2;
-        const wx = Math.sin(angle) * 2.1;
-        const wz = Math.cos(angle) * 2.1;
-        this._box(g, 0.75, 0.5, 0.15, 0xffdd88, wx, 2.0 + ri*(towerH/winRows), wz, angle);
-      });
+    
+    // Bright golden ground plane for visibility
+    this._plane(g, 14, 14, 0xffdd77, 0, 0.04, 0);
+    
+    // Main building structure - bright amber/gold building
+    this._box(g, 9.0, h, 8.0, 0xddaa55, 0, h/2, 0); // Bright amber body
+    this._box(g, 9.4, 0.45, 8.4, 0xcc9944, 0, h + 0.22, 0); // Accent band
+    this._box(g, 9.0, 0.8, 8.0, 0xbb8833, 0, h + 0.85, 0); // Roof cap
+    
+    // Windows with bright orange glow
+    const wins = [];
+    const rows = Math.max(2, Math.floor(floors * 0.5));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < 3; col++) {
+        wins.push(this._box(g, 1.7, 1.3, 0.2, 0xffddaa, -2.8 + col*2.8, 1.3 + row*(h/rows), 4.05));
+      }
     }
-    this._lamp(g, -5, 4); this._lamp(g, 5, 4);
+    
+    // Entrance door
+    this._box(g, 2.0, 3.0, 0.2, 0xbb8833, 0, 1.5, 4.05);
+    
+    // Corner accent columns
+    this._box(g, 0.5, h, 0.5, 0xeecc66, -4.2, h/2, -3.7);
+    this._box(g, 0.5, h, 0.5, 0xeecc66, 4.2, h/2, -3.7);
+    this._box(g, 0.5, h, 0.5, 0xeecc66, -4.2, h/2, 3.7);
+    this._box(g, 0.5, h, 0.5, 0xeecc66, 4.2, h/2, 3.7);
+    
+    // Rooftop feature
+    this._box(g, 2.5, 1.0, 2.5, 0xeecc66, 0, h + 1.35, 0);
+    this._sphere(g, 0.5, 0xffaa22, 0, h + 2.0, 0);
+    
+    this._lamp(g, -5, 5); this._lamp(g, 5, 5);
     this._tree(g, 6, -5, 3.5, 2.2);
-    this._register(g, slug, capY + 4.85, 1.5, 5.85); // PipTransaction: multiplier=1.5, accessories=5.85
-    this._windows.set(slug, []);
+    this._register(g, slug, h + 2.2, 1.2, 2.2); // PipTransaction: multiplier=1.2, accessories=2.2
+    this._windows.set(slug, wins);
   }
 
   // ── partner-webview-automation-test ──────────────────────────────────────
@@ -706,19 +733,28 @@ export class BuildingManager {
     const visualFloors = this._scaleFloors(floors);
     const h = visualFloors * 1.0;
     const g = new THREE.Group();
-    this._plane(g, 14, 12, 0x5a5a4a, 0, 0.04, 0);
-    this._box(g, 8.5, h,     7.0, 0x7a7060, 0, h/2,      0);
-    this._box(g, 8.9, 0.35,  7.4, 0x5a5248, 0, h + 0.17, 0);
-    this._box(g, 8.5, 0.55,  7.0, 0x4a4840, 0, h + 0.62, 0);
-    this._box(g, 2.2, 1.5, 0.25, 0x3a2e22, -2.5, 2.5, 3.55);
-    this._box(g, 2.2, 1.5, 0.25, 0x3a2e22,  2.5, 2.5, 3.55);
-    this._box(g, 2.2, 1.5, 0.25, 0x3a2e22, -2.5, 4.5, 3.55);
-    this._box(g, 2.2, 1.5, 0.25, 0x3a2e22,  2.5, 4.5, 3.55);
-    this._box(g, 2.4, 0.12, 0.12, 0x2a2018, -2.5, 2.5, 3.62);
-    this._box(g, 0.12, 1.6, 0.12, 0x2a2018, -2.5, 2.5, 3.62);
-    this._box(g, 2.4, 0.12, 0.12, 0x2a2018,  2.5, 2.5, 3.62);
-    this._box(g, 0.12, 1.6, 0.12, 0x2a2018,  2.5, 2.5, 3.62);
-    this._box(g, 2.2, 3.2, 0.25, 0x4a4030, 0, 1.6, 3.55);
+    
+    // Bright yellow-orange ground plane for high visibility
+    this._plane(g, 14, 12, 0xffdd33, 0, 0.04, 0);
+    
+    // Main building structure - bright orange/yellow for maintenance visibility
+    this._box(g, 8.5, h, 7.0, 0xff9933, 0, h/2, 0); // Bright orange main body
+    this._box(g, 8.9, 0.35, 7.4, 0xffaa44, 0, h + 0.17, 0); // Bright accent band
+    this._box(g, 8.5, 0.55, 7.0, 0xff8800, 0, h + 0.62, 0); // Bright roof cap
+    
+    // Warning stripes on corners - black & yellow for caution
+    this._box(g, 0.5, h, 0.5, 0xffcc00, -4.0, h/2, -3.25);
+    this._box(g, 0.5, h, 0.5, 0x000000, -4.0, h/2 + 0.5, -3.25);
+    this._box(g, 0.5, h, 0.5, 0xffcc00,  4.0, h/2,  3.25);
+    this._box(g, 0.5, h, 0.5, 0x000000,  4.0, h/2 + 0.5,  3.25);
+    
+    // Large warning signs - bright red with yellow borders
+    this._box(g, 3.5, 2.5, 0.25, 0xff0000, -2.0, h/2, 3.55);
+    this._box(g, 3.2, 2.2, 0.25, 0xffcc00, -2.0, h/2, 3.58);
+    this._box(g, 3.5, 2.5, 0.25, 0xff0000,  2.0, h/2, 3.55);
+    this._box(g, 3.2, 2.2, 0.25, 0xffcc00,  2.0, h/2, 3.58);
+    
+    // Hazard barrier posts around perimeter - highly visible
     const hazardPosts = [
       [-5,-5],[ 0,-5],[ 5,-5],
       [-5, 5],[ 0, 5],[ 5, 5],
@@ -726,14 +762,36 @@ export class BuildingManager {
       [ 5,-2],[ 5, 2],
     ];
     hazardPosts.forEach(([px, pz], idx) => {
-      this._cyl(g, 0.09, 0.1, 1.2, idx % 2 === 0 ? 0xffcc00 : 0x222222, px, 0.6, pz);
+      this._cyl(g, 0.12, 0.14, 1.5, idx % 2 === 0 ? 0xffcc00 : 0x222222, px, 0.75, pz);
     });
-    this._cyl(g, 0.07, 0.09, 1.5, 0x555555, 0, h + 0.62 + 0.75, 0);
-    this._box(g, 2.8, 0.7, 0.12, 0xcc4400, 0, h + 0.62 + 1.57, 0);
-    this._box(g, 2.6, 0.5, 0.08, 0xffaa00, 0, h + 0.62 + 1.57, 0);
-    this._box(g, 0.08, 1.8, 0.08, 0x2a2a2a, -1.0, 2.0, 3.62);
-    this._box(g, 1.4, 0.08, 0.08, 0x2a2a2a,  1.5, 3.8, 3.62);
-    this._register(g, slug, h + 0.62 + 2.1, 1.0, 2.72); // Ginpay: multiplier=1.0, accessories=2.72
+    
+    // "MAINTENANCE ONLY" sign attached to building front - compact yellow/red sign
+    this._box(g, 4.0, 1.2, 0.12, 0xffcc00, 0, h * 0.7, 3.56); // Yellow background
+    this._box(g, 3.8, 1.0, 0.14, 0xff0000, 0, h * 0.7, 3.58); // Red inner panel
+    
+    // Add CSS2D text label for "MAINTENANCE ONLY" - smaller and attached to building
+    const maintenanceDiv = document.createElement('div');
+    maintenanceDiv.style.cssText = `
+      background: #ffcc00;
+      color: #000;
+      padding: 4px 10px;
+      border: 2px solid #ff0000;
+      border-radius: 3px;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      font-size: 10px;
+      text-align: center;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      pointer-events: none;
+      user-select: none;
+    `;
+    maintenanceDiv.textContent = 'MAINTENANCE ONLY';
+    const maintenanceLabel = new CSS2DObject(maintenanceDiv);
+    maintenanceLabel.position.set(0, h * 0.7, 3.7); // Attached to front of building
+    g.add(maintenanceLabel);
+    
+    this._register(g, slug, h + 0.62, 1.0, 0.62);
     this._windows.set(slug, []);
   }
 

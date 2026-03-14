@@ -36,12 +36,12 @@ const SPACING = 16;
  * colSpacing: x-distance between columns (defaults to SPACING).
  * rowSpacing: z-distance between rows    (defaults to SPACING).
  *
- * ms-pip uses colSpacing=8 because its NE-district waypoints sit at
- * x = 24, 32, 40 (8-unit steps), while row spacing stays 16.
+ * ms-pip uses colSpacing=14 to provide adequate gaps between buildings,
+ * while row spacing stays 16 for proper street separation.
  */
 const DISTRICT_GRID = {
   'ms-partner': { origin: [-64, -8],  cols: 4, rowDir: -1 },
-  'ms-pip':     { origin: [ 24, -24], cols: 3, rowDir: -1, colSpacing: 8 },
+  'ms-pip':     { origin: [ 24, -24], cols: 3, rowDir: -1, colSpacing: 14 },
 };
 
 /**
