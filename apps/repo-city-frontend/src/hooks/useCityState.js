@@ -49,7 +49,7 @@ export function useCityState(workers = []) {
     const totalOpenMrs = snapshot.districts?.reduce((s, d) => s + (d.openMrCount ?? 0), 0) ?? 0;
 
     setStats({
-      repoCount:            REPOS.length,
+      repoCount:            snapshot.districts?.length ?? 0,
       activeDeveloperCount: snapshot.stats?.activeDeveloperCount ?? 0,
       totalCommits:         snapshot.stats?.totalCommits          ?? 0,
       openMrCount:          snapshot.stats?.openMrCount           ?? totalOpenMrs,
