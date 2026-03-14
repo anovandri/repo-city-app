@@ -272,8 +272,14 @@ public class CityStateService {
 
         // Resolve author — may be null if the author field wasn't in the payload
         Optional<GitlabUser> authorOpt = resolveAuthor(event.getAuthorUsername());
-        String  actorDisplayName    = authorOpt.map(GitlabUser::getDisplayName).orElse(event.getAuthorUsername());
-        String  actorGitlabUsername = authorOpt.map(GitlabUser::getGitlabUsername).orElse(event.getAuthorUsername());
+        String  actorDisplayName    = authorOpt.map(GitlabUser::getDisplayName)
+                                               .orElse(event.getAuthorUsername() != null && !event.getAuthorUsername().isBlank() 
+                                                       ? event.getAuthorUsername() 
+                                                       : "Pipeline");
+        String  actorGitlabUsername = authorOpt.map(GitlabUser::getGitlabUsername)
+                                               .orElse(event.getAuthorUsername() != null && !event.getAuthorUsername().isBlank() 
+                                                       ? event.getAuthorUsername() 
+                                                       : null);
         UserRole actorRole          = authorOpt.map(GitlabUser::getRole).orElse(UserRole.ENGINEER);
         Gender   actorGender        = authorOpt.map(GitlabUser::getGender).orElse(Gender.MALE);
 

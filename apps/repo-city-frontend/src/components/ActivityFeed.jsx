@@ -88,11 +88,11 @@ export function ActivityFeed({ feedRef }) {
     const verb      = TYPE_VERB[event.hint]  ?? 'acted on';
 
     // Full line text (typed out when beam fires)
-    const actorPart = event.actorDisplayName
-      ? `${event.actorDisplayName}`
+    const actorPart = event.actorDisplayName?.trim()
+      ? event.actorDisplayName.trim()
       : 'Pipeline';
-    const repoPart  = event.repoSlug ?? '?';
-    const fullText  = `${actorPart} ${verb} ${repoPart}`;
+    const repoPart  = event.repoSlug?.trim() || '(unknown repo)';
+    const fullText  = `${actorPart} ${verb} ${repoPart}`.trim();
 
     // Pipeline events skip walking phase (they fire immediately)
     const isPipelineEvent = event.hint === 'PIPELINE_RUNNING' || 
@@ -140,8 +140,14 @@ export function ActivityFeed({ feedRef }) {
       return prev;
     });
 
-    if (!fullText) return; // Line not found
-    
+    if (!fullText) {
+      // If the resolved fullText is empty (unexpected), avoid leaving the
+      // line in 'typing' state with only a cursor. Mark it done and show
+      // a fallback message so the feed remains readable.
+      setLines(prev => prev.map(l => l.id === id ? { ...l, phase: 'done', displayed: l.fullText || '(no details)' } : l));
+      return; // nothing to type
+    }
+
     // Start typewriter effect
     startTyping(id, fullText);
   }, [startTyping]);
