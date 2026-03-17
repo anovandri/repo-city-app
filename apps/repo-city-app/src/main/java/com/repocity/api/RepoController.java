@@ -14,6 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Comparator;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * REST API endpoints consumed by the city UI frontend.
@@ -29,16 +35,20 @@ public class RepoController {
     private final PollEventRepository   pollEventRepository;
     private final GitlabUserRepository  gitlabUserRepository;
     private final CityStateService      cityStateService;
+        private final com.repocity.poller.client.GitLabClient gitLabClient;
+        private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public RepoController(RepoRepository repoRepository,
-                          PollEventRepository pollEventRepository,
-                          GitlabUserRepository gitlabUserRepository,
-                          CityStateService cityStateService) {
-        this.repoRepository       = repoRepository;
-        this.pollEventRepository  = pollEventRepository;
-        this.gitlabUserRepository = gitlabUserRepository;
-        this.cityStateService     = cityStateService;
-    }
+        public RepoController(RepoRepository repoRepository,
+                                                  PollEventRepository pollEventRepository,
+                                                  GitlabUserRepository gitlabUserRepository,
+                                                  CityStateService cityStateService,
+                                                  com.repocity.poller.client.GitLabClient gitLabClient) {
+                this.repoRepository       = repoRepository;
+                this.pollEventRepository  = pollEventRepository;
+                this.gitlabUserRepository = gitlabUserRepository;
+                this.cityStateService     = cityStateService;
+                this.gitLabClient         = gitLabClient;
+        }
 
     /**
      * Returns a summary of every tracked repository, sorted by open MR count descending.
@@ -86,6 +96,40 @@ public class RepoController {
                 .cacheControl(CacheControl.noStore())
                 .body(body);
     }
+
+        /**
+         * Returns the most recent merge requests across all tracked repositories.
+         * Query param `limit` controls how many MR items to return (default 10).
+         * Each item includes: title, description, web_url, created_at, updated_at, repoSlug.
+         */
+        @GetMapping("/merge-requests/recent")
+        public ResponseEntity<List<Map<String, Object>>> recentMergeRequests(int limit) {
+                try {
+                        List<Map<String, Object>> all = new ArrayList<>();
+                        List<com.repocity.identity.domain.GitLabRepository> repos = repoRepository.findAll();
+                        for (com.repocity.identity.domain.GitLabRepository repo : repos) {
+                                String json = gitLabClient.fetchMergeRequests(repo.getGitlabProjectId(), "opened");
+                                List<Map<String, Object>> mrs = objectMapper.readValue(json, new TypeReference<List<Map<String,Object>>>(){});
+                                for (Map<String, Object> mr : mrs) {
+                                        Map<String, Object> item = new HashMap<>();
+                                        item.put("title", mr.getOrDefault("title", "(no title)"));
+                                        item.put("description", mr.getOrDefault("description", ""));
+                                        item.put("web_url", mr.get("web_url"));
+                                        item.put("created_at", mr.get("created_at"));
+                                        item.put("updated_at", mr.get("updated_at"));
+                                        item.put("repoSlug", repo.getSlug());
+                                        all.add(item);
+                                }
+                        }
+                        // Sort by updated_at (fallback to created_at) desc
+                        all.sort(Comparator.comparing((Map<String,Object> m) -> (String)(m.getOrDefault("updated_at", m.get("created_at")))) .reversed());
+                        if (limit <= 0) limit = 10;
+                        List<Map<String,Object>> out = all.size() > limit ? all.subList(0, limit) : all;
+                        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(out);
+                } catch (Exception e) {
+                        return ResponseEntity.status(500).body(List.of());
+                }
+        }
 
     /**
      * Returns every registered developer (GitLab user) sorted by display name.

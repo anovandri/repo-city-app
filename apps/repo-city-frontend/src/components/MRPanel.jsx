@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { REPOS } from '../constants/repos.js';
 
 const GITLAB_NAMESPACE = 'https://gitlab.com/dk-digital-bank/services';

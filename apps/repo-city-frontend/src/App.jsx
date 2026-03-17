@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { CityCanvas } from './components/CityCanvas.jsx';
 import { HUD }        from './components/HUD.jsx';
 import { MRPanel }    from './components/MRPanel.jsx';
+import { MergeRequests } from './components/MergeRequests.jsx';
 import { DevPanel }   from './components/DevPanel.jsx';
 import { SimPanel }   from './components/SimPanel.jsx';
 import { LeaderboardPanel } from './components/LeaderboardPanel.jsx';
@@ -25,6 +26,7 @@ export default function App() {
   const snapshotApplied    = useRef(false); // true once the first snapshot has been applied
 
   const [showMR,  setShowMR]  = useState(false);
+  const [showMRDetails, setShowMRDetails] = useState(false);
   const [showDev, setShowDev] = useState(false);
   const [showSim, setShowSim] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -221,12 +223,14 @@ export default function App() {
       <HUD
         stats={stats}
         onOpenMRPanel={() => setShowMR(true)}
+        onOpenMRDetails={() => setShowMRDetails(true)}
         onOpenDevPanel={() => setShowDev(true)}
         onOpenLeaderboardPanel={() => setShowLeaderboard(true)}
       />
 
       {/* Overlay panels */}
       {showMR  && <MRPanel  mrMap={mrMap} mrListUrls={mrListUrls} onClose={() => setShowMR(false)} />}
+      {showMRDetails && <MergeRequests onClose={() => setShowMRDetails(false)} />}
       {showDev && (
         <DevPanel 
           workers={workers} 
