@@ -2009,126 +2009,196 @@ const ENG_SHIRTS = [0xff4444, 0x44aaff, 0xffaa00, 0x44cc66, 0xcc44cc,
 // Caretakers only roam between plaza and the EOC support building
 const CARETAKER_WPS = [0, 53];
 
+// ── Voxel Character Helper ───────────────────────────────────
+function createVoxelCube(width, height, depth, color, x, y, z) {
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+  const material = new THREE.MeshLambertMaterial({ color });
+  const cube = new THREE.Mesh(geometry, material);
+  cube.position.set(x, y, z);
+  cube.castShadow = true;
+  cube.receiveShadow = true;
+  return cube;
+}
+
 function makePerson(person, idx, startX, startZ) {
   const { gender, role } = person;
   const isFemale   = gender === 'female';
   const isLeader   = role   === 'leader';
   const isCaretaker = role  === 'caretaker';
 
-  const skinColor  = isFemale ? 0xf7c8a0 : 0xf5c07a;
+  const skinColor  = isFemale ? 0xfdbcb4 : 0xf5c898;
   const shirtColor = isLeader    ? 0xddaa00
                    : isCaretaker ? (isFemale ? 0x44bb66 : 0x228844)
                    : ENG_SHIRTS[idx % ENG_SHIRTS.length];
-  const legColor   = isFemale ? 0xdd8888 : isLeader ? 0x222255 : 0x2255cc;
-  const hatColor   = isLeader    ? 0xffcc00
-                   : isCaretaker ? 0x88dd88
-                   : [0xffdd00,0xffffff,0xff6600,0x00dddd,0xff88cc,
-                      0xaaffaa,0xff99ff,0xffcc44,0x44ffee,0xccccff][idx % 10];
-  const scale = isLeader ? 1.25 : 1.0;
+  const pantsColor = isFemale ? 0xaa6688 : isLeader ? 0x222255 : 0x2c3e50;
+  const hairColor  = isLeader    ? 0x8b4513
+                   : isCaretaker ? 0x654321
+                   : [0x8b4513, 0x000000, 0x654321, 0x3a2010, 0x8b7355,
+                      0x4a3020, 0x2a1810, 0x6b5020, 0x1a0a00, 0x5a4030][idx % 10];
+  const scale = isLeader ? 1.4 : 1.0;
 
-  const g   = new THREE.Group();
-  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+  const g = new THREE.Group();
+  
+  // ──────────────────────────────────────────────────────────────────
+  // VOXEL CHARACTER - Fully cube-based design
+  // ──────────────────────────────────────────────────────────────────
+  
+  // HEAD (slightly larger, stylized)
+  const head = createVoxelCube(0.16, 0.16, 0.16, skinColor, 0, 0.46, 0);
+  g.add(head);
 
+  // HAIR - Layered voxel hair
+  const hairTop = createVoxelCube(0.17, 0.05, 0.17, hairColor, 0, 0.545, 0);
+  g.add(hairTop);
+  
   if (isFemale) {
-    // Skirt
-    const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.14), mat(legColor));
-    skirt.position.set(0, 0.1, 0); g.add(skirt);
-    const shL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), mat(0x333333));
-    shL.position.set(-0.05, 0.03, 0); g.add(shL);
-    const shR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), mat(0x333333));
-    shR.position.set( 0.05, 0.03, 0); g.add(shR);
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.18, 0.10), mat(shirtColor));
-    torso.position.set(0, 0.29, 0); g.add(torso);
-    const aL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.06), mat(shirtColor));
-    aL.position.set(-0.13, 0.28, 0); g.add(aL);
-    const aR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.06), mat(shirtColor));
-    aR.position.set( 0.13, 0.28, 0); g.add(aR);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), mat(skinColor));
-    head.position.set(0, 0.46, 0); g.add(head);
-    // Hair bun
-    const bun = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), mat(0x3a2010));
-    bun.position.set(0, 0.57, -0.03); g.add(bun);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.04, 0.04), mat(0xee6699));
-    band.position.set(0, 0.545, -0.03); g.add(band);
-
-    g.scale.setScalar(scale);
-    g.position.set(startX, 0, startZ);
-    scene.add(g);
-
-    // Floating name chip
-    const div = document.createElement('div');
-    div.className = 'dev-name dev-name--female' + (isCaretaker ? ' dev-name--caretaker' : '');
-    div.textContent = person.name;
-    const lObj = new CSS2DObject(div);
-    lObj.position.set(0, 0.78 * scale, 0);
-    g.add(lObj);
-
-    return { group: g, lL: skirt, lR: shL, aL, aR, role, isStationary: false, name: person.name };
-
+    // Female: Long flowing hair with bangs
+    // Front bangs (wider and softer)
+    const bang1 = createVoxelCube(0.06, 0.06, 0.03, hairColor, -0.05, 0.51, 0.09);
+    const bang2 = createVoxelCube(0.06, 0.06, 0.03, hairColor, 0.05, 0.51, 0.09);
+    const bang3 = createVoxelCube(0.04, 0.05, 0.03, hairColor, 0, 0.52, 0.09);
+    g.add(bang1, bang2, bang3);
+    
+    // Long side hair flowing down
+    const sideL1 = createVoxelCube(0.04, 0.10, 0.14, hairColor, -0.09, 0.48, 0);
+    const sideR1 = createVoxelCube(0.04, 0.10, 0.14, hairColor, 0.09, 0.48, 0);
+    g.add(sideL1, sideR1);
+    
+    // Extended side hair (lower sections for length)
+    const sideL2 = createVoxelCube(0.04, 0.08, 0.12, hairColor, -0.09, 0.36, -0.01);
+    const sideR2 = createVoxelCube(0.04, 0.08, 0.12, hairColor, 0.09, 0.36, -0.01);
+    g.add(sideL2, sideR2);
+    
+    // Back hair (long flowing down the back)
+    const backHair1 = createVoxelCube(0.16, 0.08, 0.04, hairColor, 0, 0.50, -0.10);
+    const backHair2 = createVoxelCube(0.14, 0.08, 0.04, hairColor, 0, 0.42, -0.10);
+    const backHair3 = createVoxelCube(0.12, 0.06, 0.04, hairColor, 0, 0.34, -0.10);
+    g.add(backHair1, backHair2, backHair3);
+    
+    // Hair ribbon/accessory at the back
+    const ribbon = createVoxelCube(0.10, 0.04, 0.03, 0xee6699, -0.06, 0.50, -0.11);
+    const ribbon2 = createVoxelCube(0.10, 0.04, 0.03, 0xee6699, 0.06, 0.50, -0.11);
+    g.add(ribbon, ribbon2);
   } else {
-    // Male legs
-    const lL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.18, 0.09), mat(legColor));
-    lL.position.set(-0.05, 0.09, 0); g.add(lL);
-    const lR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.18, 0.09), mat(legColor));
-    lR.position.set( 0.05, 0.09, 0); g.add(lR);
-    const torso = new THREE.Mesh(
-      new THREE.BoxGeometry(isLeader ? 0.23 : 0.2, isLeader ? 0.22 : 0.2, 0.11),
-      mat(shirtColor)
-    );
-    torso.position.set(0, 0.28, 0); g.add(torso);
-    const aL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.17, 0.07), mat(shirtColor));
-    aL.position.set(-0.14, 0.27, 0); g.add(aL);
-    const aR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.17, 0.07), mat(shirtColor));
-    aR.position.set( 0.14, 0.27, 0); g.add(aR);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.17, 0.17), mat(skinColor));
-    head.position.set(0, 0.46, 0); g.add(head);
-
-    if (isLeader) {
-      // Gold crown brim + 3 spikes + gem
-      const crown = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.05, 0.23), mat(0xffcc00));
-      crown.position.set(0, 0.565, 0); g.add(crown);
-      [-0.07, 0, 0.07].forEach(cx => {
-        const spike = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.05), mat(0xffdd33));
-        spike.position.set(cx, 0.635, 0); g.add(spike);
-      });
-      const gem = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), mat(0xff4444));
-      gem.position.set(0, 0.695, -0.06); g.add(gem);
-    } else {
-      // Flat cap + brim
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.2), mat(hatColor));
-      cap.position.set(0, 0.565, 0); g.add(cap);
-      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.12), mat(hatColor));
-      brim.position.set(0, 0.538, -0.06); g.add(brim);
-    }
-
-    g.scale.setScalar(scale);
-    if (isLeader) {
-      // Seat Wira on the south plaza bench at (0, 0, -6), rotation Math.PI
-      g.position.set(startX, 0.18, startZ);   // sit on seat (y=0.18)
-      g.rotation.y = Math.PI;                  // face inward toward statue
-      lL.rotation.x = -Math.PI / 2;            // legs bent horizontal
-      lR.rotation.x = -Math.PI / 2;
-      lL.position.set(-0.05, 0.0,  0.09);      // thighs project forward
-      lR.position.set( 0.05, 0.0,  0.09);
-      aL.rotation.x =  0.5;                    // arms rest on lap
-      aR.rotation.x =  0.5;
-    } else {
-      g.position.set(startX, 0, startZ);
-    }
-    scene.add(g);
-
-    // Floating name chip
-    const div = document.createElement('div');
-    div.className = 'dev-name'
-      + (isLeader    ? ' dev-name--leader'    : '')
-      + (isCaretaker ? ' dev-name--caretaker' : '');
-    div.textContent = isLeader ? '👑 ' + person.name : person.name;
-    const lObj = new CSS2DObject(div);
-    lObj.position.set(0, (isLeader ? 0.88 : 0.72) * scale, 0);
-    g.add(lObj);
-
-    return { group: g, lL, lR, aL, aR, role, isStationary: isLeader, name: person.name };
+    // Male: Front bangs + side hair
+    const bang1 = createVoxelCube(0.04, 0.06, 0.03, hairColor, -0.04, 0.51, 0.09);
+    const bang2 = createVoxelCube(0.04, 0.06, 0.03, hairColor, 0, 0.51, 0.09);
+    const bang3 = createVoxelCube(0.04, 0.06, 0.03, hairColor, 0.04, 0.51, 0.09);
+    g.add(bang1, bang2, bang3);
+    const sideL = createVoxelCube(0.03, 0.08, 0.12, hairColor, -0.09, 0.47, 0);
+    const sideR = createVoxelCube(0.03, 0.08, 0.12, hairColor, 0.09, 0.47, 0);
+    g.add(sideL, sideR);
   }
+
+  // FACE - Voxel eyes (NO spheres!)
+  const leftEyeWhite = createVoxelCube(0.03, 0.04, 0.02, 0xffffff, -0.04, 0.48, 0.085);
+  const leftEyePupil = createVoxelCube(0.015, 0.02, 0.01, 0x000000, -0.04, 0.48, 0.092);
+  const rightEyeWhite = createVoxelCube(0.03, 0.04, 0.02, 0xffffff, 0.04, 0.48, 0.085);
+  const rightEyePupil = createVoxelCube(0.015, 0.02, 0.01, 0x000000, 0.04, 0.48, 0.092);
+  g.add(leftEyeWhite, leftEyePupil, rightEyeWhite, rightEyePupil);
+
+  // Eyebrows
+  const leftBrow = createVoxelCube(0.04, 0.01, 0.01, hairColor, -0.04, 0.51, 0.085);
+  const rightBrow = createVoxelCube(0.04, 0.01, 0.01, hairColor, 0.04, 0.51, 0.085);
+  g.add(leftBrow, rightBrow);
+
+  // Simple mouth
+  const mouth = createVoxelCube(0.04, 0.01, 0.01, 0xd68a7a, 0, 0.43, 0.085);
+  g.add(mouth);
+
+  // NECK
+  const neck = createVoxelCube(0.06, 0.04, 0.06, skinColor, 0, 0.36, 0);
+  g.add(neck);
+
+  // TORSO - Layered for detail
+  const torso = createVoxelCube(isLeader ? 0.23 : 0.19, isLeader ? 0.20 : 0.18, 0.11, shirtColor, 0, 0.28, 0);
+  g.add(torso);
+
+  // Collar detail
+  const collarL = createVoxelCube(0.04, 0.03, 0.02, shirtColor, -0.05, 0.36, 0.06);
+  const collarR = createVoxelCube(0.04, 0.03, 0.02, shirtColor, 0.05, 0.36, 0.06);
+  g.add(collarL, collarR);
+
+  // ARMS - Blocky voxel arms
+  const aL = createVoxelCube(0.05, 0.16, 0.05, shirtColor, -0.13, 0.27, 0);
+  const aR = createVoxelCube(0.05, 0.16, 0.05, shirtColor, 0.13, 0.27, 0);
+  g.add(aL, aR);
+  
+  // Hands
+  const handL = createVoxelCube(0.04, 0.04, 0.04, skinColor, -0.13, 0.17, 0);
+  const handR = createVoxelCube(0.04, 0.04, 0.04, skinColor, 0.13, 0.17, 0);
+  g.add(handL, handR);
+
+  // LEGS - Different style for female
+  let lL, lR;
+  if (isFemale) {
+    // Female: Skirt style
+    const skirt = createVoxelCube(0.20, 0.10, 0.12, pantsColor, 0, 0.14, 0);
+    g.add(skirt);
+    lL = createVoxelCube(0.06, 0.08, 0.06, skinColor, -0.05, 0.06, 0);
+    lR = createVoxelCube(0.06, 0.08, 0.06, skinColor, 0.05, 0.06, 0);
+    g.add(lL, lR);
+    // Shoes
+    const shoeL = createVoxelCube(0.06, 0.03, 0.08, 0x34495e, -0.05, 0.015, 0.01);
+    const shoeR = createVoxelCube(0.06, 0.03, 0.08, 0x34495e, 0.05, 0.015, 0.01);
+    g.add(shoeL, shoeR);
+  } else {
+    // Male: Pants style
+    const hip = createVoxelCube(0.20, 0.04, 0.10, pantsColor, 0, 0.17, 0);
+    g.add(hip);
+    lL = createVoxelCube(0.07, 0.14, 0.07, pantsColor, -0.05, 0.09, 0);
+    lR = createVoxelCube(0.07, 0.14, 0.07, pantsColor, 0.05, 0.09, 0);
+    g.add(lL, lR);
+    // Shoes
+    const shoeL = createVoxelCube(0.08, 0.03, 0.09, 0x34495e, -0.05, 0.015, 0.015);
+    const shoeR = createVoxelCube(0.08, 0.03, 0.09, 0x34495e, 0.05, 0.015, 0.015);
+    g.add(shoeL, shoeR);
+  }
+
+  // LEADER SPECIAL: Crown
+  if (isLeader) {
+    const crownBase = createVoxelCube(0.20, 0.04, 0.20, 0xffcc00, 0, 0.57, 0);
+    g.add(crownBase);
+    // Crown spikes
+    [-0.06, 0, 0.06].forEach(cx => {
+      const spike = createVoxelCube(0.04, 0.08, 0.04, 0xffdd33, cx, 0.63, 0);
+      g.add(spike);
+    });
+    // Crown gem
+    const gem = createVoxelCube(0.03, 0.03, 0.03, 0xff4444, 0, 0.67, -0.08);
+    g.add(gem);
+  }
+
+  g.scale.setScalar(scale);
+
+  if (isLeader) {
+    // Seat leader on the south plaza bench facing forward (north)
+    g.position.set(startX, 0.18, startZ);
+    g.rotation.y = 0; // Face forward (north) instead of backward
+    lL.rotation.x = -Math.PI / 2;
+    lR.rotation.x = -Math.PI / 2;
+    lL.position.set(-0.05, 0.0, -0.09); // Adjust z position for forward-facing legs
+    lR.position.set( 0.05, 0.0, -0.09); // Adjust z position for forward-facing legs
+    aL.rotation.x =  0.5;
+    aR.rotation.x =  0.5;
+  } else {
+    g.position.set(startX, 0, startZ);
+  }
+  
+  scene.add(g);
+
+  // Floating name chip
+  const div = document.createElement('div');
+  div.className = 'dev-name'
+    + (isFemale    ? ' dev-name--female'    : '')
+    + (isLeader    ? ' dev-name--leader'    : '')
+    + (isCaretaker ? ' dev-name--caretaker' : '');
+  div.textContent = isLeader ? '👑 ' + person.name : person.name;
+  const lObj = new CSS2DObject(div);
+  lObj.position.set(0, (isLeader ? 0.88 : isFemale ? 0.70 : 0.72) * scale, 0);
+  g.add(lObj);
+
+  return { group: g, lL, lR, aL, aR, role, isStationary: isLeader, name: person.name };
 }
 
 // Build all 36 developers

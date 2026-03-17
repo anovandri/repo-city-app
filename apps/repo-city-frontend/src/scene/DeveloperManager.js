@@ -11,10 +11,10 @@ const ENG_SHIRTS = [
   0xff6655, 0x33bbdd, 0xdd8800, 0x55dd77, 0xbb55bb,
 ];
 
-// Hat colours for engineers (10-entry palette)
-const HAT_COLORS = [
-  0xffdd00, 0xffffff, 0xff6600, 0x00dddd, 0xff88cc,
-  0xaaffaa, 0xff99ff, 0xffcc44, 0x44ffee, 0xccccff,
+// Hair colours for voxel characters (10-entry palette)
+const HAIR_COLORS = [
+  0x2c1810, 0x3a2010, 0x1a0e08, 0x4a3020, 0x1c1410,
+  0x5a4030, 0x3c2818, 0x2a1c14, 0x1e1410, 0x443020,
 ];
 
 // Caretakers only patrol between plaza (0) and EOC approach (53)
@@ -257,10 +257,21 @@ export class DeveloperManager {
     return new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity });
   }
 
+  // Helper for creating voxel cubes
+  _createVoxelCube(width, height, depth, color, x, y, z) {
+    const geometry = this._geo(width, height, depth);
+    const material = this._mat(color);
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(x, y, z);
+    cube.castShadow = false; // Performance: developers don't need shadows
+    cube.receiveShadow = false;
+    return cube;
+  }
+
   // ── Spawn all developers ─────────────────────────────────────────────────
 
   _buildAll(people) {
-    let engIdx = 0; // separate counter for engineer shirt/hat cycling
+    let engIdx = 0; // separate counter for engineer shirt/hair cycling
 
     people.forEach((person, idx) => {
       const isLeader    = person.role === 'leader';
@@ -268,30 +279,30 @@ export class DeveloperManager {
       const isEngineer  = !isLeader && !isCaretaker;
       const isFemale    = person.gender === 'female';
 
-      const scale = isLeader ? 1.25 : 1.0;
+      const scale = isLeader ? 1.4 : 1.0;
 
-      // Determine shirt/hat/leg/skin colours
-      let shirtColor, legColor, hatColor;
-      const skinColor = isFemale ? 0xf7c8a0 : 0xf5c07a;
+      // Determine shirt/pants/hair/skin colours for voxel characters
+      let shirtColor, pantsColor, hairColor;
+      const skinColor = isFemale ? 0xfdbcb4 : 0xf5c898;
 
       if (isLeader) {
         shirtColor = 0xddaa00;
-        legColor   = 0x222255;
-        hatColor   = 0xffcc00;
+        pantsColor = 0x222255;
+        hairColor  = 0x3a2010;
       } else if (isCaretaker) {
         shirtColor = isFemale ? 0x44bb66 : 0x228844;
-        legColor   = isFemale ? 0xdd8888 : 0x2255cc;
-        hatColor   = 0x88dd88;
+        pantsColor = isFemale ? 0xaa6688 : 0x2c3e50;
+        hairColor  = 0x2c1810;
       } else {
         shirtColor = ENG_SHIRTS[engIdx % 15];
-        legColor   = isFemale ? 0xdd8888 : 0x2255cc;
-        hatColor   = HAT_COLORS[engIdx % 10];
+        pantsColor = isFemale ? 0xaa6688 : 0x2c3e50;
+        hairColor  = HAIR_COLORS[engIdx % 10];
         engIdx++;
       }
 
       const group = isFemale
-        ? this._makeFemale(person, scale, skinColor, shirtColor, legColor, hatColor, isLeader)
-        : this._makeMale  (person, scale, skinColor, shirtColor, legColor, hatColor, isLeader, isCaretaker);
+        ? this._makeFemale(person, scale, skinColor, shirtColor, pantsColor, hairColor, isLeader)
+        : this._makeMale  (person, scale, skinColor, shirtColor, pantsColor, hairColor, isLeader, isCaretaker);
 
       group.scale.setScalar(scale);
 
@@ -322,13 +333,13 @@ export class DeveloperManager {
       };
 
       if (isLeader) {
-        // Seated on south bench facing north
+        // Seated on south bench facing forward (north)
         group.position.set(0, 0.18, -6);
-        group.rotation.y = PI;
+        group.rotation.y = 0; // Face forward (north) instead of backward
         // Bend leader legs forward
         const { legL, legR, armL, armR } = group.userData;
-        if (legL) { legL.rotation.x = -PI / 2; legL.position.set(-0.05, 0.0, 0.09); }
-        if (legR) { legR.rotation.x = -PI / 2; legR.position.set( 0.05, 0.0, 0.09); }
+        if (legL) { legL.rotation.x = -PI / 2; legL.position.set(-0.05, 0.0, -0.09); }
+        if (legR) { legR.rotation.x = -PI / 2; legR.position.set( 0.05, 0.0, -0.09); }
         if (armL) armL.rotation.x = 0.5;
         if (armR) armR.rotation.x = 0.5;
       } else {
@@ -344,67 +355,93 @@ export class DeveloperManager {
 
   // ── Character construction ───────────────────────────────────────────────
 
-  _makeMale(person, scale, skinColor, shirtColor, legColor, hatColor, isLeader, isCaretaker) {
+  _makeMale(person, scale, skinColor, shirtColor, pantsColor, hairColor, isLeader, isCaretaker) {
     const g = new THREE.Group();
-
-    // Legs
-    const legMat  = this._mat(legColor);
-    const legGeom = this._geo(0.09, 0.18, 0.09);
-    const lL = new THREE.Mesh(legGeom, legMat);
-    lL.position.set(-0.05, 0.09, 0);
-    lL.castShadow = false; // Performance: developers don't need shadows
-    const lR = new THREE.Mesh(legGeom, legMat);
-    lR.position.set( 0.05, 0.09, 0);
-    lR.castShadow = false; // Performance: developers don't need shadows
-    g.add(lL, lR);
-
-    // Torso
-    const torsoW = isLeader ? 0.23 : 0.2;
-    const torsoH = isLeader ? 0.22 : 0.2;
-    const torso = new THREE.Mesh(this._geo(torsoW, torsoH, 0.11), this._mat(shirtColor));
-    torso.position.set(0, 0.28, 0);
-    torso.castShadow = false; // Performance: developers don't need shadows
-    g.add(torso);
-
-    // Arms
-    const armMat  = this._mat(shirtColor);
-    const armGeom = this._geo(0.07, 0.17, 0.07);
-    const aL = new THREE.Mesh(armGeom, armMat);
-    aL.position.set(-0.14, 0.27, 0);
-    aL.castShadow = false; // Performance: developers don't need shadows
-    const aR = new THREE.Mesh(armGeom, armMat);
-    aR.position.set( 0.14, 0.27, 0);
-    aR.castShadow = false; // Performance: developers don't need shadows
-    g.add(aL, aR);
-
-    // Head
-    const head = new THREE.Mesh(this._geo(0.17, 0.17, 0.17), this._mat(skinColor));
-    head.position.set(0, 0.46, 0);
-    head.castShadow = false; // Performance: developers don't need shadows
+    
+    // ──────────────────────────────────────────────────────────────────
+    // VOXEL CHARACTER - Male
+    // ──────────────────────────────────────────────────────────────────
+    
+    // HEAD
+    const head = this._createVoxelCube(0.16, 0.16, 0.16, skinColor, 0, 0.46, 0);
     g.add(head);
 
-    // Hat / crown
+    // HAIR - Layered voxel hair
+    const hairTop = this._createVoxelCube(0.17, 0.05, 0.17, hairColor, 0, 0.545, 0);
+    g.add(hairTop);
+    
+    // Male: Front bangs + side hair
+    const bang1 = this._createVoxelCube(0.04, 0.06, 0.03, hairColor, -0.04, 0.51, 0.09);
+    const bang2 = this._createVoxelCube(0.04, 0.06, 0.03, hairColor, 0, 0.51, 0.09);
+    const bang3 = this._createVoxelCube(0.04, 0.06, 0.03, hairColor, 0.04, 0.51, 0.09);
+    g.add(bang1, bang2, bang3);
+    const sideL = this._createVoxelCube(0.03, 0.08, 0.12, hairColor, -0.09, 0.47, 0);
+    const sideR = this._createVoxelCube(0.03, 0.08, 0.12, hairColor, 0.09, 0.47, 0);
+    g.add(sideL, sideR);
+
+    // FACE - Voxel eyes
+    const leftEyeWhite = this._createVoxelCube(0.03, 0.04, 0.02, 0xffffff, -0.04, 0.48, 0.085);
+    const leftEyePupil = this._createVoxelCube(0.015, 0.02, 0.01, 0x000000, -0.04, 0.48, 0.092);
+    const rightEyeWhite = this._createVoxelCube(0.03, 0.04, 0.02, 0xffffff, 0.04, 0.48, 0.085);
+    const rightEyePupil = this._createVoxelCube(0.015, 0.02, 0.01, 0x000000, 0.04, 0.48, 0.092);
+    g.add(leftEyeWhite, leftEyePupil, rightEyeWhite, rightEyePupil);
+
+    // Eyebrows
+    const leftBrow = this._createVoxelCube(0.04, 0.01, 0.01, hairColor, -0.04, 0.51, 0.085);
+    const rightBrow = this._createVoxelCube(0.04, 0.01, 0.01, hairColor, 0.04, 0.51, 0.085);
+    g.add(leftBrow, rightBrow);
+
+    // Simple mouth
+    const mouth = this._createVoxelCube(0.04, 0.01, 0.01, 0xd68a7a, 0, 0.43, 0.085);
+    g.add(mouth);
+
+    // NECK
+    const neck = this._createVoxelCube(0.06, 0.04, 0.06, skinColor, 0, 0.36, 0);
+    g.add(neck);
+
+    // TORSO - Layered for detail
+    const torso = this._createVoxelCube(isLeader ? 0.23 : 0.19, isLeader ? 0.20 : 0.18, 0.11, shirtColor, 0, 0.28, 0);
+    g.add(torso);
+
+    // Collar detail
+    const collarL = this._createVoxelCube(0.04, 0.03, 0.02, shirtColor, -0.05, 0.36, 0.06);
+    const collarR = this._createVoxelCube(0.04, 0.03, 0.02, shirtColor, 0.05, 0.36, 0.06);
+    g.add(collarL, collarR);
+
+    // ARMS - Blocky voxel arms
+    const aL = this._createVoxelCube(0.05, 0.16, 0.05, shirtColor, -0.13, 0.27, 0);
+    const aR = this._createVoxelCube(0.05, 0.16, 0.05, shirtColor, 0.13, 0.27, 0);
+    g.add(aL, aR);
+    
+    // Hands
+    const handL = this._createVoxelCube(0.04, 0.04, 0.04, skinColor, -0.13, 0.17, 0);
+    const handR = this._createVoxelCube(0.04, 0.04, 0.04, skinColor, 0.13, 0.17, 0);
+    g.add(handL, handR);
+
+    // LEGS - Pants style
+    const hip = this._createVoxelCube(0.20, 0.04, 0.10, pantsColor, 0, 0.17, 0);
+    g.add(hip);
+    const lL = this._createVoxelCube(0.07, 0.14, 0.07, pantsColor, -0.05, 0.09, 0);
+    const lR = this._createVoxelCube(0.07, 0.14, 0.07, pantsColor, 0.05, 0.09, 0);
+    g.add(lL, lR);
+    
+    // Shoes
+    const shoeL = this._createVoxelCube(0.08, 0.03, 0.09, 0x34495e, -0.05, 0.015, 0.015);
+    const shoeR = this._createVoxelCube(0.08, 0.03, 0.09, 0x34495e, 0.05, 0.015, 0.015);
+    g.add(shoeL, shoeR);
+
+    // LEADER SPECIAL: Crown
     if (isLeader) {
-      const brim = new THREE.Mesh(this._geo(0.23, 0.05, 0.23), this._mat(hatColor));
-      brim.position.set(0, 0.565, 0);
-      g.add(brim);
-      const spike = this._geo(0.05, 0.10, 0.05);
-      const spikeMat = this._mat(hatColor);
-      [-0.07, 0, 0.07].forEach(sx => {
-        const s = new THREE.Mesh(spike, spikeMat);
-        s.position.set(sx, 0.635, 0);
-        g.add(s);
+      const crownBase = this._createVoxelCube(0.20, 0.04, 0.20, 0xffcc00, 0, 0.57, 0);
+      g.add(crownBase);
+      // Crown spikes
+      [-0.06, 0, 0.06].forEach(cx => {
+        const spike = this._createVoxelCube(0.04, 0.08, 0.04, 0xffdd33, cx, 0.63, 0);
+        g.add(spike);
       });
-      const gem = new THREE.Mesh(this._geo(0.04, 0.04, 0.04), this._mat(0xff4444));
-      gem.position.set(0, 0.695, -0.06);
+      // Crown gem
+      const gem = this._createVoxelCube(0.03, 0.03, 0.03, 0xff4444, 0, 0.67, -0.08);
       g.add(gem);
-    } else {
-      const cap  = new THREE.Mesh(this._geo(0.2, 0.07, 0.2), this._mat(hatColor));
-      cap.position.set(0, 0.565, 0);
-      g.add(cap);
-      const brim = new THREE.Mesh(this._geo(0.24, 0.03, 0.12), this._mat(hatColor));
-      brim.position.set(0, 0.538, -0.06);
-      g.add(brim);
     }
 
     // Store limb refs for animation
@@ -417,58 +454,103 @@ export class DeveloperManager {
     return g;
   }
 
-  _makeFemale(person, scale, skinColor, shirtColor, legColor, hatColor, isLeader) {
+  _makeFemale(person, scale, skinColor, shirtColor, pantsColor, hairColor, isLeader) {
     const g = new THREE.Group();
-
-    // Skirt / dress bottom
-    const skirt = new THREE.Mesh(this._geo(0.22, 0.2, 0.14), this._mat(legColor));
-    skirt.position.set(0, 0.1, 0);
-    skirt.castShadow = false; // Performance: developers don't need shadows
-    g.add(skirt);
-
-    // Shoes
-    const shoeMat  = this._mat(0x4a3010);
-    const shoeGeom = this._geo(0.07, 0.06, 0.09);
-    const shL = new THREE.Mesh(shoeGeom, shoeMat);
-    shL.position.set(-0.05, 0.03, 0);
-    const shR = new THREE.Mesh(shoeGeom, shoeMat);
-    shR.position.set( 0.05, 0.03, 0);
-    g.add(shL, shR);
-
-    // Torso
-    const torso = new THREE.Mesh(this._geo(0.19, 0.18, 0.10), this._mat(shirtColor));
-    torso.position.set(0, 0.29, 0);
-    torso.castShadow = false; // Performance: developers don't need shadows
-    g.add(torso);
-
-    // Arms
-    const armMat  = this._mat(shirtColor);
-    const armGeom = this._geo(0.06, 0.15, 0.06);
-    const aL = new THREE.Mesh(armGeom, armMat);
-    aL.position.set(-0.13, 0.28, 0);
-    aL.castShadow = false; // Performance: developers don't need shadows
-    const aR = new THREE.Mesh(armGeom, armMat);
-    aR.position.set( 0.13, 0.28, 0);
-    aR.castShadow = false; // Performance: developers don't need shadows
-    g.add(aL, aR);
-
-    // Head
-    const head = new THREE.Mesh(this._geo(0.16, 0.16, 0.16), this._mat(skinColor));
-    head.position.set(0, 0.46, 0);
-    head.castShadow = false; // Performance: developers don't need shadows
+    
+    // ──────────────────────────────────────────────────────────────────
+    // VOXEL CHARACTER - Female
+    // ──────────────────────────────────────────────────────────────────
+    
+    // HEAD
+    const head = this._createVoxelCube(0.16, 0.16, 0.16, skinColor, 0, 0.46, 0);
     g.add(head);
 
-    // Hair bun + band
-    const bun = new THREE.Mesh(this._geo(0.09, 0.09, 0.09), this._mat(0x3a2010));
-    bun.position.set(0, 0.57, -0.03);
-    g.add(bun);
-    const band = new THREE.Mesh(this._geo(0.17, 0.04, 0.04), this._mat(0xee6699));
-    band.position.set(0, 0.545, -0.03);
-    g.add(band);
+    // HAIR - Layered voxel hair (top layer)
+    const hairTop = this._createVoxelCube(0.17, 0.05, 0.17, hairColor, 0, 0.545, 0);
+    g.add(hairTop);
+    
+    // Female: Long flowing hair with bangs
+    // Front bangs (wider and softer)
+    const bang1 = this._createVoxelCube(0.06, 0.06, 0.03, hairColor, -0.05, 0.51, 0.09);
+    const bang2 = this._createVoxelCube(0.06, 0.06, 0.03, hairColor, 0.05, 0.51, 0.09);
+    const bang3 = this._createVoxelCube(0.04, 0.05, 0.03, hairColor, 0, 0.52, 0.09);
+    g.add(bang1, bang2, bang3);
+    
+    // Long side hair flowing down
+    const sideL1 = this._createVoxelCube(0.04, 0.10, 0.14, hairColor, -0.09, 0.48, 0);
+    const sideR1 = this._createVoxelCube(0.04, 0.10, 0.14, hairColor, 0.09, 0.48, 0);
+    g.add(sideL1, sideR1);
+    
+    // Extended side hair (lower sections for length)
+    const sideL2 = this._createVoxelCube(0.04, 0.08, 0.12, hairColor, -0.09, 0.36, -0.01);
+    const sideR2 = this._createVoxelCube(0.04, 0.08, 0.12, hairColor, 0.09, 0.36, -0.01);
+    g.add(sideL2, sideR2);
+    
+    // Back hair (long flowing down the back)
+    const backHair1 = this._createVoxelCube(0.16, 0.08, 0.04, hairColor, 0, 0.50, -0.10);
+    const backHair2 = this._createVoxelCube(0.14, 0.08, 0.04, hairColor, 0, 0.42, -0.10);
+    const backHair3 = this._createVoxelCube(0.12, 0.06, 0.04, hairColor, 0, 0.34, -0.10);
+    g.add(backHair1, backHair2, backHair3);
+    
+    // Hair ribbon/accessory at the back
+    const ribbon = this._createVoxelCube(0.10, 0.04, 0.03, 0xee6699, -0.06, 0.50, -0.11);
+    const ribbon2 = this._createVoxelCube(0.10, 0.04, 0.03, 0xee6699, 0.06, 0.50, -0.11);
+    g.add(ribbon, ribbon2);
 
-    // Dummy leg refs (skirt is static, no walking bend needed but keep symmetry)
-    g.userData.legL = null;
-    g.userData.legR = null;
+    // FACE - Voxel eyes
+    const leftEyeWhite = this._createVoxelCube(0.03, 0.04, 0.02, 0xffffff, -0.04, 0.48, 0.085);
+    const leftEyePupil = this._createVoxelCube(0.015, 0.02, 0.01, 0x000000, -0.04, 0.48, 0.092);
+    const rightEyeWhite = this._createVoxelCube(0.03, 0.04, 0.02, 0xffffff, 0.04, 0.48, 0.085);
+    const rightEyePupil = this._createVoxelCube(0.015, 0.02, 0.01, 0x000000, 0.04, 0.48, 0.092);
+    g.add(leftEyeWhite, leftEyePupil, rightEyeWhite, rightEyePupil);
+
+    // Eyebrows
+    const leftBrow = this._createVoxelCube(0.04, 0.01, 0.01, hairColor, -0.04, 0.51, 0.085);
+    const rightBrow = this._createVoxelCube(0.04, 0.01, 0.01, hairColor, 0.04, 0.51, 0.085);
+    g.add(leftBrow, rightBrow);
+
+    // Simple mouth
+    const mouth = this._createVoxelCube(0.04, 0.01, 0.01, 0xd68a7a, 0, 0.43, 0.085);
+    g.add(mouth);
+
+    // NECK
+    const neck = this._createVoxelCube(0.06, 0.04, 0.06, skinColor, 0, 0.36, 0);
+    g.add(neck);
+
+    // TORSO - Layered for detail
+    const torso = this._createVoxelCube(0.19, 0.18, 0.11, shirtColor, 0, 0.28, 0);
+    g.add(torso);
+
+    // Collar detail
+    const collarL = this._createVoxelCube(0.04, 0.03, 0.02, shirtColor, -0.05, 0.36, 0.06);
+    const collarR = this._createVoxelCube(0.04, 0.03, 0.02, shirtColor, 0.05, 0.36, 0.06);
+    g.add(collarL, collarR);
+
+    // ARMS - Blocky voxel arms
+    const aL = this._createVoxelCube(0.05, 0.16, 0.05, shirtColor, -0.13, 0.27, 0);
+    const aR = this._createVoxelCube(0.05, 0.16, 0.05, shirtColor, 0.13, 0.27, 0);
+    g.add(aL, aR);
+    
+    // Hands
+    const handL = this._createVoxelCube(0.04, 0.04, 0.04, skinColor, -0.13, 0.17, 0);
+    const handR = this._createVoxelCube(0.04, 0.04, 0.04, skinColor, 0.13, 0.17, 0);
+    g.add(handL, handR);
+
+    // LEGS - Skirt style
+    const skirt = this._createVoxelCube(0.20, 0.10, 0.12, pantsColor, 0, 0.14, 0);
+    g.add(skirt);
+    const lL = this._createVoxelCube(0.06, 0.08, 0.06, skinColor, -0.05, 0.06, 0);
+    const lR = this._createVoxelCube(0.06, 0.08, 0.06, skinColor, 0.05, 0.06, 0);
+    g.add(lL, lR);
+    
+    // Shoes
+    const shoeL = this._createVoxelCube(0.06, 0.03, 0.08, 0x34495e, -0.05, 0.015, 0.01);
+    const shoeR = this._createVoxelCube(0.06, 0.03, 0.08, 0x34495e, 0.05, 0.015, 0.01);
+    g.add(shoeL, shoeR);
+
+    // Store limb refs for animation
+    g.userData.legL = lL;
+    g.userData.legR = lR;
     g.userData.armL = aL;
     g.userData.armR = aR;
 
@@ -477,7 +559,7 @@ export class DeveloperManager {
   }
 
   _attachLabel(group, person, isLeader, isFemale, scale) {
-    const labelY = isLeader ? 0.88 : isFemale ? 0.78 : 0.72;
+    const labelY = isLeader ? 0.88 : isFemale ? 0.70 : 0.72;
     const prefix = isLeader ? '👑 ' : '';
     const div = document.createElement('div');
     div.className = 'dev-label';

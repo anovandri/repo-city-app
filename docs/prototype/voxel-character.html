@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voxel Character - Three.js</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #87ceeb, #e0f6ff);
+      font-family: 'Arial', sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    #info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #333;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    #info h2 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #2c3e50;
+    }
+    #info p {
+      margin: 5px 0;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h2>🎮 Voxel Character Prototype</h2>
+    <p><strong>Style:</strong> Fully voxel-based (cubes only)</p>
+    <p><strong>Features:</strong> Layered detail, expressive eyes</p>
+    <p><strong>Animation:</strong> Idle breathing + rotation</p>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // ========================================================================
+    // SCENE SETUP
+    // ========================================================================
+    
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 20, 50);
+
+    const camera = new THREE.PerspectiveCamera(
+      50,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(8, 4, 8);
+    camera.lookAt(0, 2, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // ========================================================================
+    // LIGHTING
+    // ========================================================================
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.left = -10;
+    directionalLight.shadow.camera.right = 10;
+    directionalLight.shadow.camera.top = 10;
+    directionalLight.shadow.camera.bottom = -10;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // ========================================================================
+    // HELPER FUNCTION: CREATE CUBE
+    // ========================================================================
+    
+    function createCube(width, height, depth, color, x, y, z, castShadow = true) {
+      const geometry = new THREE.BoxGeometry(width, height, depth);
+      const material = new THREE.MeshLambertMaterial({ color });
+      const cube = new THREE.Mesh(geometry, material);
+      cube.position.set(x, y, z);
+      cube.castShadow = castShadow;
+      cube.receiveShadow = true;
+      return cube;
+    }
+
+    // ========================================================================
+    // VOXEL CHARACTER CREATION
+    // ========================================================================
+    
+    function createVoxelCharacter(skinColor = 0xfdbcb4, hairColor = 0x8b4513, 
+                                   shirtColor = 0x3498db, pantsColor = 0x2c3e50) {
+      const character = new THREE.Group();
+
+      // ──────────────────────────────────────────────────────────────────
+      // HEAD (Slightly larger, stylized proportions)
+      // ──────────────────────────────────────────────────────────────────
+      const head = createCube(1.2, 1.2, 1.2, skinColor, 0, 3.5, 0);
+      character.add(head);
+
+      // HAIR - Layered cubes for depth
+      // Top layer (main hair volume)
+      const hairTop = createCube(1.3, 0.4, 1.3, hairColor, 0, 4.1, 0);
+      character.add(hairTop);
+
+      // Front hair bangs (3 cubes for variation)
+      const bang1 = createCube(0.35, 0.5, 0.25, hairColor, -0.3, 3.85, 0.65);
+      const bang2 = createCube(0.35, 0.5, 0.25, hairColor, 0, 3.85, 0.65);
+      const bang3 = createCube(0.35, 0.5, 0.25, hairColor, 0.3, 3.85, 0.65);
+      character.add(bang1, bang2, bang3);
+
+      // Side hair detail
+      const hairSideL = createCube(0.25, 0.6, 0.9, hairColor, -0.65, 3.6, 0);
+      const hairSideR = createCube(0.25, 0.6, 0.9, hairColor, 0.65, 3.6, 0);
+      character.add(hairSideL, hairSideR);
+
+      // Back hair
+      const hairBack = createCube(1.2, 0.7, 0.3, hairColor, 0, 3.7, -0.65);
+      character.add(hairBack);
+
+      // ──────────────────────────────────────────────────────────────────
+      // FACE - Expressive voxel eyes (NO SPHERES)
+      // ──────────────────────────────────────────────────────────────────
+      
+      // Left Eye
+      const leftEyeWhite = createCube(0.25, 0.3, 0.15, 0xffffff, -0.25, 3.6, 0.62);
+      const leftEyePupil = createCube(0.12, 0.15, 0.08, 0x000000, -0.25, 3.6, 0.68);
+      character.add(leftEyeWhite, leftEyePupil);
+
+      // Right Eye
+      const rightEyeWhite = createCube(0.25, 0.3, 0.15, 0xffffff, 0.25, 3.6, 0.62);
+      const rightEyePupil = createCube(0.12, 0.15, 0.08, 0x000000, 0.25, 3.6, 0.68);
+      character.add(rightEyeWhite, rightEyePupil);
+
+      // Eyebrows (for expression)
+      const leftBrow = createCube(0.3, 0.08, 0.08, 0x654321, -0.25, 3.85, 0.62);
+      const rightBrow = createCube(0.3, 0.08, 0.08, 0x654321, 0.25, 3.85, 0.62);
+      character.add(leftBrow, rightBrow);
+
+      // Simple mouth
+      const mouth = createCube(0.35, 0.08, 0.08, 0xd68a7a, 0, 3.25, 0.62);
+      character.add(mouth);
+
+      // ──────────────────────────────────────────────────────────────────
+      // NECK
+      // ──────────────────────────────────────────────────────────────────
+      const neck = createCube(0.4, 0.3, 0.4, skinColor, 0, 2.75, 0);
+      character.add(neck);
+
+      // ──────────────────────────────────────────────────────────────────
+      // TORSO (Layered for clothing detail)
+      // ──────────────────────────────────────────────────────────────────
+      
+      // Main shirt body
+      const torso = createCube(1.4, 1.3, 0.8, shirtColor, 0, 2.0, 0);
+      character.add(torso);
+
+      // Shirt collar detail
+      const collarL = createCube(0.3, 0.25, 0.15, shirtColor, -0.35, 2.6, 0.42);
+      const collarR = createCube(0.3, 0.25, 0.15, shirtColor, 0.35, 2.6, 0.42);
+      character.add(collarL, collarR);
+
+      // Shirt pocket detail (small cube)
+      const pocket = createCube(0.25, 0.25, 0.1, 0x2980b9, -0.4, 1.9, 0.45);
+      character.add(pocket);
+
+      // ──────────────────────────────────────────────────────────────────
+      // ARMS (Blocky with layered detail)
+      // ──────────────────────────────────────────────────────────────────
+      
+      // Left Arm
+      const leftShoulder = createCube(0.4, 0.4, 0.4, shirtColor, -0.9, 2.4, 0);
+      const leftUpperArm = createCube(0.35, 0.7, 0.35, shirtColor, -0.9, 1.75, 0);
+      const leftForearm = createCube(0.3, 0.6, 0.3, skinColor, -0.9, 1.0, 0);
+      const leftHand = createCube(0.25, 0.25, 0.25, skinColor, -0.9, 0.55, 0);
+      character.add(leftShoulder, leftUpperArm, leftForearm, leftHand);
+
+      // Right Arm
+      const rightShoulder = createCube(0.4, 0.4, 0.4, shirtColor, 0.9, 2.4, 0);
+      const rightUpperArm = createCube(0.35, 0.7, 0.35, shirtColor, 0.9, 1.75, 0);
+      const rightForearm = createCube(0.3, 0.6, 0.3, skinColor, 0.9, 1.0, 0);
+      const rightHand = createCube(0.25, 0.25, 0.25, skinColor, 0.9, 0.55, 0);
+      character.add(rightShoulder, rightUpperArm, rightForearm, rightHand);
+
+      // ──────────────────────────────────────────────────────────────────
+      // LEGS (Layered pants detail)
+      // ──────────────────────────────────────────────────────────────────
+      
+      // Left Leg
+      const leftHip = createCube(0.5, 0.3, 0.6, pantsColor, -0.35, 1.2, 0);
+      const leftThigh = createCube(0.45, 0.7, 0.5, pantsColor, -0.35, 0.7, 0);
+      const leftShin = createCube(0.4, 0.7, 0.4, pantsColor, -0.35, 0.0, 0);
+      const leftShoe = createCube(0.45, 0.2, 0.6, 0x34495e, -0.35, -0.45, 0.1);
+      character.add(leftHip, leftThigh, leftShin, leftShoe);
+
+      // Right Leg
+      const rightHip = createCube(0.5, 0.3, 0.6, pantsColor, 0.35, 1.2, 0);
+      const rightThigh = createCube(0.45, 0.7, 0.5, pantsColor, 0.35, 0.7, 0);
+      const rightShin = createCube(0.4, 0.7, 0.4, pantsColor, 0.35, 0.0, 0);
+      const rightShoe = createCube(0.45, 0.2, 0.6, 0x34495e, 0.35, -0.45, 0.1);
+      character.add(rightHip, rightThigh, rightShin, rightShoe);
+
+      // Pants seam detail (center line)
+      const seam = createCube(0.1, 1.0, 0.55, 0x1a252f, 0, 0.85, 0);
+      character.add(seam);
+
+      // Belt
+      const belt = createCube(1.4, 0.15, 0.75, 0x8b7355, 0, 1.35, 0);
+      const beltBuckle = createCube(0.2, 0.15, 0.1, 0xf39c12, 0, 1.35, 0.42);
+      character.add(belt, beltBuckle);
+
+      // Store body parts for animation
+      character.userData = {
+        leftArm: leftUpperArm,
+        rightArm: rightUpperArm,
+        leftLeg: leftThigh,
+        rightLeg: rightThigh,
+        head: head
+      };
+
+      return character;
+    }
+
+    // ========================================================================
+    // CREATE GROUND PLANE
+    // ========================================================================
+    
+    const groundGeometry = new THREE.PlaneGeometry(30, 30);
+    const groundMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x90c695,
+      side: THREE.DoubleSide 
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.6;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Add grid pattern on ground for depth
+    const gridHelper = new THREE.GridHelper(30, 30, 0x7ab57d, 0x7ab57d);
+    gridHelper.position.y = -0.59;
+    scene.add(gridHelper);
+
+    // ========================================================================
+    // CREATE MULTIPLE CHARACTERS (Variation showcase)
+    // ========================================================================
+    
+    // Character 1 - Default
+    const character1 = createVoxelCharacter(
+      0xfdbcb4, // skin
+      0x8b4513, // brown hair
+      0x3498db, // blue shirt
+      0x2c3e50  // dark pants
+    );
+    character1.position.set(-3, 0, 0);
+    scene.add(character1);
+
+    // Character 2 - Different colors
+    const character2 = createVoxelCharacter(
+      0xe8b89a, // lighter skin
+      0xffd700, // blonde hair
+      0xe74c3c, // red shirt
+      0x34495e  // gray pants
+    );
+    character2.position.set(0, 0, 0);
+    scene.add(character2);
+
+    // Character 3 - More variation
+    const character3 = createVoxelCharacter(
+      0xc68642, // tan skin
+      0x000000, // black hair
+      0x27ae60, // green shirt
+      0x8b4513  // brown pants
+    );
+    character3.position.set(3, 0, 0);
+    scene.add(character3);
+
+    // ========================================================================
+    // ANIMATION
+    // ========================================================================
+    
+    let time = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      time += 0.01;
+
+      // Idle breathing animation
+      character1.position.y = Math.sin(time * 2) * 0.05;
+      character2.position.y = Math.sin(time * 2 + 1) * 0.05;
+      character3.position.y = Math.sin(time * 2 + 2) * 0.05;
+
+      // Subtle head bob
+      if (character1.userData.head) {
+        character1.userData.head.rotation.y = Math.sin(time) * 0.05;
+        character2.userData.head.rotation.y = Math.sin(time + 1) * 0.05;
+        character3.userData.head.rotation.y = Math.sin(time + 2) * 0.05;
+      }
+
+      // Gentle arm sway
+      if (character1.userData.leftArm) {
+        character1.userData.leftArm.rotation.x = Math.sin(time * 1.5) * 0.1;
+        character1.userData.rightArm.rotation.x = Math.sin(time * 1.5 + Math.PI) * 0.1;
+        
+        character2.userData.leftArm.rotation.x = Math.sin(time * 1.5 + 1) * 0.1;
+        character2.userData.rightArm.rotation.x = Math.sin(time * 1.5 + Math.PI + 1) * 0.1;
+        
+        character3.userData.leftArm.rotation.x = Math.sin(time * 1.5 + 2) * 0.1;
+        character3.userData.rightArm.rotation.x = Math.sin(time * 1.5 + Math.PI + 2) * 0.1;
+      }
+
+      // Slow rotation for preview
+      character1.rotation.y += 0.003;
+      character2.rotation.y += 0.003;
+      character3.rotation.y += 0.003;
+
+      // Camera orbit
+      const radius = 8;
+      camera.position.x = Math.cos(time * 0.2) * radius;
+      camera.position.z = Math.sin(time * 0.2) * radius;
+      camera.lookAt(0, 2, 0);
+
+      renderer.render(scene, camera);
+    }
+
+    // ========================================================================
+    // WINDOW RESIZE
+    // ========================================================================
+    
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ========================================================================
+    // START ANIMATION
+    // ========================================================================
+    
+    animate();
+  </script>
+</body>
+</html>
